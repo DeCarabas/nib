@@ -1,0 +1,543 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Playing with Editors</title>
+    <style type="text/css">
+     .block { margin-top: 10px; margin-bottom: 10px; position: relative; border: 1px solid transparent; }
+     .label { display: inline-block; vertical-align: top; width: 180px; padding-right: 20px; text-align: right; font-style: italic; }
+     .code { display: inline-block; vertical-align: top; width: 500px; white-space: pre; font-family: Consolas; }
+     .text { display: inline-block; vertical-align: top; width: 500px; }
+     .result { display: inline-block; vertical-align: top; font-style: italic; }
+
+     .identifier { color: green; }
+     .keyword { color: blue; }
+     
+     .selected { border: 1px solid blue; }
+    </style>
+  </head>  
+  <body>
+    <div id="root">        
+    </div>
+    <script type="text/javascript">
+     // Language core.
+     //
+     var tokenType = {
+       identifier: 1, numberLiteral: 2, 
+       equals: 100, arrow: 101, plus: 102, minus: 103,
+       letKeyword: 200, fnKeyword: 201, inKeyword: 202,
+       eof: 900, error: 999, 
+     };       
+     var lex = (function() {
+       var tokens = {
+         equals:     { type: tokenType.equals,     value: "=",   length: 1 },
+         arrow:      { type: tokenType.arrow,      value: "=>",  length: 2 },
+         plus:       { type: tokenType.plus,       value: "+",   length: 1 },
+         minus:      { type: tokenType.minux,      value: "-",   length: 1 },
+         letKeyword: { type: tokenType.letKeyword, value: "let", length: 3, keyword: true },
+         fnKeyword:  { type: tokenType.fnKeyword,  value: "fn",  length: 2, keyword: true },
+         inKeyword:  { type: tokenType.inKeyword,  value: "in",  length: 2, keyword: true },
+         eof:        { type: tokenType.eof,                      length: 0 }
+       };
+       function reservedWordLookup(identifier) {
+         switch (identifier.charCodeAt(0)) {
+           case /*f*/102:
+             switch (identifier) {
+               case 'fn': return tokens.fnKeyword;
+             }
+             break;
+             
+           case /*i*/105:
+             switch (identifier) {
+               case 'in': return tokens.inKeyword;
+             }
+             break;
+             
+           case /*l*/108:
+             switch (identifier) {
+               case 'let': return tokens.letKeyword;
+             }
+             break;
+         }
+         return;
+       }       
+       function isIdentifierStartCharacter(code) {
+         switch (code) {
+           case (code >= /*a*/97 && code <= /*z*/122) && code:
+           case (code >= /*A*/65 && code <= /*Z*/90) && code:
+           case /*$*/36:
+           case /*_*/95:
+             return true;
+           default:
+             return false;
+         }
+       }              
+       function readIdentifierPart(text, offset, limit) {
+         while (offset < limit) {
+           var code = text.charCodeAt(offset);
+           switch (code) {               
+             case (code >= /*a*/97 && code <= /*z*/122) && code: // (Inlined isIdentifierStartCharacter)
+             case (code >= /*A*/65 && code <= /*Z*/90) && code:
+             case /*$*/36:
+             case /*_*/95:
+               break;
+             case (code >= /*0*/48 && code <= /*9*/57) && code: // (Inlined isDecimalDigit)
+               break;
+             default: 
+               return offset;
+           }
+           offset++;
+         }
+         return offset;
+       }
+       function readIdentifierToken(text, start, offset, limit) {
+         offset = readIdentifierPart(text, offset, limit);
+         var length = offset - start;
+
+         var value = text.substr(start, length);
+         return reservedWordLookup(value) || { type: tokenType.identifier, length: length, value: value };
+       }
+       function isDecimalDigit(code) {
+         return (code >= /*0*/48 && code <= /*9*/57) && code;
+       }
+       function readDecimalDigits(text, offset, limit) {
+         while (offset < limit && isDecimalDigit(text.charCodeAt(offset))) {
+           offset++;
+         }
+         return offset;
+       }
+       function readDecimalLiteral(text, offset, limit) {
+         offset = readDecimalDigits(text, offset, limit);
+         if (offset < limit && text.charCodeAt(offset) === /*.*/46 && offset + 1 < limit && isDecimalDigit(text.charCodeAt(offset + 1))) {
+           offset = readDecimalDigits(text, offset + 2, limit);
+         }
+         if (offset < limit) {
+           var code = text.charCodeAt(offset);
+           if (code === /*e*/101 || code === /*E*/69) {
+             var tempOffset = offset + 1;
+             if (tempOffset < limit) {
+               code = text.charCodeAt(tempOffset);
+               if (code === /*+*/43 || code === /*-*/45) {
+                 tempOffset++;
+               }
+               offset = readDecimalDigits(text, tempOffset, limit);
+             }
+           }
+         }
+         return offset;
+       }
+       function readDecimalLiteralToken(text, start, offset, limit) {
+         offset = readDecimalLiteral(text, offset, limit);
+         var length = offset - start;
+
+         return { type: tokenType.numberLiteral, length: length, value: text.substr(start, length) };
+       }
+       function isWhitespace(code) {
+         switch (code) {
+           case 0x0009:    // tab
+           case 0x000A:    // line feed
+           case 0x000B:    // vertical tab
+           case 0x000C:    // form feed
+           case 0x000D:    // carriage return
+           case 0x0020:    // space
+           case 0x00A0:    // no-breaking space
+           case 0x1680:    // Unicode category Zs follow:
+           case 0x180e:
+           case (code >= 0x2000 && code <= 0x200a) && code:
+           case 0x2028:    // line separator
+           case 0x2029:    // paragraph separator
+           case 0x202f:
+           case 0x205f:
+           case 0x3000:
+           case 0xFEFF:    // BOM
+             return true;
+             
+           default:
+             return false;
+         }
+       }       
+       function readWhitespace(text, offset, limit) {
+         while (offset < limit) {
+           var code = text.charCodeAt(offset);
+           if (!isWhitespace(code)) { return offset; }
+           offset++;
+         }
+         return offset;
+       }
+       function readWhitespaceToken(text, start, offset, limit) {
+         offset = readWhitespace(text, offset);
+         var length = offset - start;
+         
+         return { type: tokenType.whitespace, length: length, value: text.substr(start, length) };
+       }
+       return function lex(text, offset, limit) {
+         offset = offset || 0;
+         limit = limit || text.length;
+
+         var result = [];
+         while (offset < limit) {
+           var startOffset = offset;
+           var code = text.charCodeAt(offset++);
+           var type;
+           var token;
+           
+           switch (code) {
+             case isWhitespace(code) && code:
+               token = readWhitespaceToken(text, startOffset, offset, limit);
+               break;
+
+             case /*+*/43:
+             case /*-*/45:
+               if (offset < limit) {
+                 var afterSign = text.charCodeAt(offset);
+                 if (afterSign === /*.*/46) {
+                   var signOffset = offset + 1;
+                   if (signOffset < limit && isDecimalDigit(text.charCodeAt(signOffset))) {
+                     token = readDecimalLiteralToken(text, startOffset, signOffset, limit);
+                     break;
+                   }
+                 } else if (isDecimalDigit(afterSign)) {
+                   token = readDecimalLiteralToken(text, startOffset, offset, limit);
+                   break;
+                 } 
+               }
+               if (code === /*+*/43) {
+                 token = tokens.plus;
+               } else {
+                 token = tokens.minus;
+               }
+               break;
+
+             case (code >= /*0*/48 && code <= /*9*/57) && code:
+               token = readDecimalLiteralToken(text, startOffset, offset, limit);
+               break;
+
+             case /*=*/61:
+               if (offset < limit && text.charCodeAt(offset) === /*>*/62) {
+                 token = tokens.arrow;
+               } else {
+                 token = tokens.equals;
+               }
+               break;
+
+             case isIdentifierStartCharacter(code) && code:
+               token = readIdentifierToken(text, startOffset, offset, limit);
+               break;
+             
+             default:
+               // TODO: Suppress duplicate error tokens; merge them together. Or resync on whitespace?
+               token = { type: tokenType.error, length: offset - startOffset, value: text.substring(startOffset, offset) };
+               break;
+           }
+
+           offset += (token.length - 1);
+           result.push(token);
+         }
+         result.push(tokens.eof);
+         return result;
+       }
+     })();
+    </script>
+    <script type="text/javascript">
+      var notebook = {
+        blocks: [
+          {
+            kind: 'textBlock',
+            content: '= This little notebook is a program.\n\nA notebook has text, like this, interspersed with code.\n\nHere\'s some code:'
+          },
+          {
+            // This is wrong because you really want to store the tree, of course.
+            kind: 'codeBlock',
+            label: 'Function One',
+            code: 'let x = fn a b => a + b\n  in x 5',
+            result: 'fn x : int -> int'        
+          },
+          {
+            kind: 'textBlock',
+            content: 'As you can see, that was a function that returned a function.'
+          }
+        ]
+      };
+
+      // Block metadata
+      //
+      var blockTypes = {
+        'textBlock': {
+          contentClassName: 'text',
+          setContent: function setTextContent(block, text) {
+            block.content = text;
+          },
+          getContentElement: function getTextContent(block) {
+            // TODO: Creole conversion to HTML, once the parser is working.
+            var e = document.createElement('div');
+            e.className = 'text';
+            if (block.content) {
+              e.innerText = block.content;
+            }
+            return e;
+          }
+        },
+        'codeBlock': {
+          contentClassName: 'code',
+          setContent: function setCodeContent(block, text) {
+            block.code = text;
+          },
+          getContentElement: function getCodeContent(block) {
+            var e = document.createElement('div');
+            e.className = 'code';
+            
+            lex(block.code).forEach(function handleToken(token) {
+              if (token.type === tokenType.eof) { return; }
+
+              var span = document.createElement('span');
+              if (token.keyword) {
+                span.className = 'keyword';
+              } else if (token.type === tokenType.identifier) {
+                span.className = 'identifier';
+              } else if (token.type === tokenType.error) {
+                span.className = 'errorToken';
+              }
+              span.innerText = token.value;
+              e.appendChild(span);
+            });
+            
+            return e;
+          }
+        }
+      };
+
+      // Rendering and DOM structure
+      //
+      function renderBlock(block) {
+        var labelElement = document.createElement('div');
+        labelElement.className = 'label';
+        if (block.label) {
+          labelElement.innerText = block.label;
+        }
+
+        var codeElement = blockTypes[block.kind].getContentElement(block);
+        
+        var resultElement = document.createElement('div');
+        resultElement.className = 'result';
+        if (block.result) {
+          resultElement.innerText = block.result;
+        }
+        
+        var elem = document.createElement('div');
+        elem.className = 'block';
+        elem.appendChild(labelElement);
+        elem.appendChild(codeElement);
+        elem.appendChild(resultElement);
+        elem.attachedBlock = block;
+        
+        return elem;
+      }
+
+      function renderNotebook(notebook) {
+        var root = document.getElementById('root');
+        notebook.blocks.forEach(function eachBlock(block) {
+          root.appendChild(renderBlock(block));
+        });
+      }
+
+      function getPart(element, part) {
+        return element.getElementsByClassName(part)[0];
+      }
+
+      // Selection management.
+      //
+      var selectedElement;
+
+      function attachedBlock(element) {
+        var elem = element;
+        while(elem) {
+          if (elem.attachedBlock) { return elem.attachedBlock; }
+          elem = elem.parentElement;
+        }
+        return null;
+      }
+      
+      function selectedBlock() {
+        return attachedBlock(selectedElement);
+      }
+      
+      function blockElement(block) {
+        var blockElements = document.getElementById('root').children;
+        for(var i = 0; i < blockElements.length; i++) {
+          var elem = blockElements[i];
+          if (attachedBlock(elem) === block) {
+            return elem;
+          }
+        }
+        return null;
+      }      
+
+
+      function selectedBlockElement() {
+        return blockElement(selectedBlock());
+      }
+      
+      function selectElement(elem) {
+        if (selectedElement) {
+          selectedElement.contentEditable = false;
+          selectedElement.classList.remove('selected');
+        }
+        selectedElement = elem;
+        if (selectedElement) {
+          selectedElement.classList.add('selected');
+          selectedElement.focus();
+        }
+      }
+      
+      function selectBlock(block) {
+        selectElement(blockElement(block));        
+      }
+      
+      function nextBlock(notebook, block) {
+        if (notebook.blocks.length === 0) { return null; }
+
+        var index = (notebook.blocks.indexOf(block) + 1) % notebook.blocks.length;        
+        return notebook.blocks[index];
+      }
+
+      function previousBlock(notebook, block) {
+        if (notebook.blocks.length === 0) { return null; }
+
+        var index = notebook.blocks.indexOf(block);
+        if (index <= 0) {
+          return notebook.blocks[notebook.blocks.length - 1];
+        } else {
+          return notebook.blocks[index - 1];
+        }
+      }      
+
+      function insertBlockAfter(notebook, block, pred) {
+        var index = notebook.blocks.indexOf(pred) + 1;
+        notebook.blocks.splice(index, 0, block);
+      }
+      
+
+      // Merge block
+      // Move block up
+      // Move block down
+      // Split block
+      // Edit content
+      // Edit label
+      
+      // Editor Commands
+      function editElement(element, modeName) {
+        selectElement(element);
+        element.contentEditable = true;
+        element.focus();
+        mode = modes[modeName];
+      }
+
+      function insertBlock(block) {
+        var elem = selectedBlockElement();
+
+        insertBlockAfter(notebook, block, attachedBlock(elem));
+        
+        var newElem = renderBlock(block);
+        elem.parentElement.insertBefore(newElem, elem.nextSibling);
+        
+        return newElem;
+      }
+
+      function replaceBlockContent(block) {
+        var element = blockElement(block);
+        var type = blockTypes[block.kind];
+        var newElement = type.getContentElement(block);
+        var oldElement = getPart(element, type.contentClassName);
+        
+        oldElement.parentElement.insertBefore(newElement, oldElement);
+        newElement.parentElement.removeChild(oldElement);
+      }
+      
+      var commands = {
+        selectPrevious: function selectPrevious() { selectBlock(previousBlock(notebook, selectedBlock())); },
+        selectNext:     function selectNext() { selectBlock(nextBlock(notebook, selectedBlock())); },
+        selectNone:     function selectNone() { selectBlock(null); },
+
+        editLabel:      function editLabel() {
+          if (selectedElement === null) { return; }
+          editElement(getPart(selectedBlockElement(), 'label'), 'editLabel');
+        },
+
+        editContent:   function editContent() {
+          if (selectedElement === null) { return; }
+          var block = selectedBlock();
+          var className = blockTypes[block.kind].contentClassName;
+          editElement(getPart(blockElement(block), className), 'editContent');
+        },
+
+        insertCodeBlock: function insertCodeBlock() {
+          selectElement(insertBlock({'kind': 'codeBlock', 'code': '...'}));
+        },
+
+        insertTextBlock: function insertTextBlock() {
+          selectElement(insertBlock({'kind': 'textBlock', 'content': '...'}));
+        },
+      };
+      
+      var modes = {
+        'select': {
+          'Up':             commands.selectPrevious,
+          'Down':           commands.selectNext,
+          'U+001B': /*ESC*/ commands.selectNone,
+          'F2':             commands.editLabel,
+          'U+004C': /* l */ commands.editLabel,
+          'U+0043': /* c */ commands.editContent,
+          'Enter':          commands.editContent,
+          'U+004F': /* o */ commands.insertCodeBlock,
+          'U+0049': /* i */ commands.insertTextBlock
+        },
+        
+        'editContent': {
+          'U+001B': /*ESC*/ function() { // ESC
+            var block = attachedBlock(selectedElement);
+
+            var type = blockTypes[block.kind];
+            type.setContent(block, selectedElement.innerText);
+            var newContent = type.getContentElement(block);
+
+            selectBlock(block);
+            replaceBlockContent(block);
+            
+            mode = modes['select'];
+          },
+        },
+
+        'editLabel': {
+          'U+001B': function() { // ESC
+            var label = selectedElement.innerText.trim();
+            selectedElement.innerText = label;
+            
+            var block = attachedBlock(selectedElement);
+            block.label = label;
+            selectBlock(block);
+            
+            mode = modes['select'];
+          },
+          'Enter': 'U+001B'
+        }
+      }
+      
+      var mode = modes['select'];
+
+      document.body.onkeyup = function editorKeyUp(evt) {
+        evt = evt || window.event;
+        kid = evt.key || evt.keyIdentifier;
+        handler = mode[kid];
+        if (handler) {
+          while (typeof(handler) === 'string') {
+            handler = mode[handler];
+          }          
+          handler(evt);
+        } else {
+          console.log(kid);
+        }
+      };
+
+      renderNotebook(notebook);
+    </script>
+  </body>
+</html>
