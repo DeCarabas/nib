@@ -295,11 +295,8 @@
        function parseBindings(token_stream) {
          var bindings = []
          do {
-           if (token_stream.peek().type === tokenType.in) {
-             break;
-           } else if (token_stream.peek().type === tokenType.semicolon) {
-             token_stream.read();
-           }
+           if (token_stream.peek().type === tokenType.semicolon) { token_stream.read(); }
+           if (token_stream.peek().type === tokenType.inKeyword) { break; }
 
            var id = token_stream.read(tokenType.identifier);
            var equals = token_stream.read(tokenType.equals);
@@ -475,7 +472,7 @@
             // This is wrong because you really want to store the tree, of course.
             kind: 'codeBlock',
             label: 'Function One',
-            code: 'let x = fn a b c d => a + b + c + d;\n    y = x 1 2\n    in y 5',
+            code: 'let x = fn a b c d => a + b + c + d;\n    y = x 1 2;\n    in y 5',
             result: 'fn x : int -> int'
           },
           {
