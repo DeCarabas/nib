@@ -9,8 +9,17 @@
      .text { display: inline-block; vertical-align: top; width: 500px; }
      .result { display: inline-block; vertical-align: top; font-style: italic; }
 
-     .identifier { color: green; }
-     .keyword { color: blue; }
+     .code div { display: inline-block; vertical-align: top; position: relative; }
+
+     .code div .bindings { display: block; margin-left: 20px; }
+     .code div .binding  { display: block; }
+
+     .identifierExpression { margin-left: 3px; color: green; }
+     .keyword { margin-left: 3px; color: blue; }
+     .operator { margin-left: 3px; }
+     .decl { margin-left: 3px; }
+
+     .applyExpression .arg { margin-left: 5px; }
 
      .selected { border: 1px solid blue; }
     </style>
@@ -466,7 +475,6 @@
      function createDiv(className) {
        var result = document.createElement("div");
        result.classList.add(className);
-       result.classList.add("expressionElement");
        return result;
      }
 
@@ -518,9 +526,9 @@
 
      function renderApplyExpression(node) {
        var applyexp = createDiv("applyExpression");
-       applyExp.appendChild(renderNode("fn", node.fn));
-       applyExp.appendChild(renderNode("arg", node.arg));
-       return applyExp;
+       applyexp.appendChild(renderNode("fn", node.fn));
+       applyexp.appendChild(renderNode("arg", node.arg));
+       return applyexp;
      }
 
      function renderIdentifierExpression(node) {
@@ -533,21 +541,21 @@
 
      function renderBinaryOperatorExpression(node) {
        var binopexp = createDiv("binaryExpression");
-       binopexp.appendChild(renderNode("left", node.left));
+       binopexp.appendChild(renderNode("left", node.children[0]));
        binopexp.appendChild(renderOperator(node.op.value));
-       binopexp.appendChild(renderNode("right", node.right));
+       binopexp.appendChild(renderNode("right", node.children[1]));
        return binopexp;
      }
 
      function renderNode(name, node) {
        var container = createDiv(name);
        switch(node.type) {
-         case nodeType.let: container.appendChild(renderLetExpression(node));
-         case nodeType.fn: container.appendChild(renderFnExpression(node));
-         case nodeType.apply: container.appendChild(renderApplyExpression(node));
-         case nodeType.identifier: container.appendChild(renderIdentifierExpression(node));
-         case nodeType.literal: container.appendChild(renderLiteralExpression(node));
-         case nodeType.binaryOperator: container.appendChild(renderBinaryOperatorExpression(node));
+         case nodeType.let: container.appendChild(renderLetExpression(node)); break;
+         case nodeType.fn: container.appendChild(renderFnExpression(node)); break;
+         case nodeType.apply: container.appendChild(renderApplyExpression(node)); break;
+         case nodeType.identifier: container.appendChild(renderIdentifierExpression(node)); break;
+         case nodeType.literal: container.appendChild(renderLiteralExpression(node)); break;
+         case nodeType.binaryOperator: container.appendChild(renderBinaryOperatorExpression(node)); break;
        }
        return container;
      }
@@ -577,25 +585,7 @@
             block.code = text;
           },
           getContentElement: function getCodeContent(block) {
-            var e = document.createElement('div');
-            e.className = 'code';
-
-            lex(block.code.text).forEach(function handleToken(token) {
-              if (token.type === tokenType.eof) { return; }
-
-              var span = document.createElement('span');
-              if (token.keyword) {
-                span.className = 'keyword';
-              } else if (token.type === tokenType.identifier) {
-                span.className = 'identifier';
-              } else if (token.type === tokenType.error) {
-                span.className = 'errorToken';
-              }
-              span.innerText = token.value;
-              e.appendChild(span);
-            });
-
-            return e;
+            return renderNode("code", block.code.tree);
           }
         }
       };
