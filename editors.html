@@ -23,7 +23,7 @@
      var tokenType = {
        identifier: 1, numberLiteral: 2,
        equals: 100, arrow: 101, plus: 102, minus: 103, multiply: 104, divide: 105,
-       letKeyword: 200, fnKeyword: 201, inKeyword: 202,
+       letKeyword: 200, fnKeyword: 201, inKeyword: 202, semicolon: 203,
        eof: 900, whitespace: 901, error: 999,
      };
      function tokenTypeName(type) {
@@ -46,6 +46,7 @@
          letKeyword: { type: tokenType.letKeyword, value: "let", length: 3, keyword: true },
          fnKeyword:  { type: tokenType.fnKeyword,  value: "fn",  length: 2, keyword: true },
          inKeyword:  { type: tokenType.inKeyword,  value: "in",  length: 2, keyword: true },
+         semicolon:  { type: tokenType.semicolon,  value: ";",   length: 1 },
          eof:        { type: tokenType.eof,                      length: 0 }
        };
        function reservedWordLookup(identifier) {
@@ -224,6 +225,10 @@
                token = readDecimalLiteralToken(text, startOffset, offset, limit);
                break;
 
+             case /*;*/59:
+               token = tokens.semicolon;
+               break;
+
              case /*=*/61:
                if (offset < limit && text.charCodeAt(offset) === /*>*/62) {
                  token = tokens.arrow;
@@ -268,7 +273,6 @@
        return "<unknown>";
      }
      var parse = function() {
-
        // Prefix expressions
        function parseIdentifier(token_stream, token) {
          return { type: nodeType.identifier, value: token };
@@ -288,30 +292,33 @@
          return { type: nodeType.fn, params: params, arrow: arrow, expr: expr, children: [expr] };
        }
 
+       function parseBindings(token_stream) {
+         var bindings = []
+         do {
+           if (token_stream.peek().type === tokenType.in) {
+             break;
+           } else if (token_stream.peek().type === tokenType.semicolon) {
+             token_stream.read();
+           }
+
+           var id = token_stream.read(tokenType.identifier);
+           var equals = token_stream.read(tokenType.equals);
+           var val = parseExpression(token_stream, precedence.let);
+
+           bindings.push({ type: nodeType.binding, decl: id, expr: val, equals: equals, children: [ val ] });
+         } while(token_stream.peek().type === tokenType.semicolon);
+
+         return bindings;
+       }
+
        function parseLet(token_stream, token) {
          // Token is already let.
-         var id = token_stream.read(tokenType.identifier);
-         var equals = token_stream.read(tokenType.equals);
-         var value = parseExpression(token_stream, precedence.let);
+         var bindings = parseBindings(token_stream);
          var in_ = token_stream.read(tokenType.inKeyword);
          var expr = parseExpression(token_stream, precedence.let);
 
-         var binding = {
-           type: nodeType.binding,
-           decl: id,
-           expr: value,
-           children: [ value ]
-         };
-
-         return {
-           type: nodeType.let,
-           let: token,
-           bindings: [ binding ],
-           equals: equals,
-           in_: in_,
-           expr: expr,
-           children: [binding, expr]
-         };
+         var children = bindings.concat(expr);
+         return { type: nodeType.let, let: token, bindings: bindings, in_: in_, expr: expr, children: children };
        }
 
        // Infix expressions
@@ -468,7 +475,7 @@
             // This is wrong because you really want to store the tree, of course.
             kind: 'codeBlock',
             label: 'Function One',
-            code: 'let x = fn a b => a + b\n  in x 5',
+            code: 'let x = fn a b c d => a + b + c + d;\n    y = x 1 2\n    in y 5',
             result: 'fn x : int -> int'
           },
           {
