@@ -577,15 +577,23 @@
               e.innerText = block.content;
             }
             return e;
+          },
+          getContentText: function getTextContentText(block) {
+            return block.content;
           }
         },
         'codeBlock': {
           contentClassName: 'code',
           setContent: function setCodeContent(block, text) {
-            block.code = text;
+            var toks = lex(text);
+            var tree = parse(toks);
+            block.code = { text: text, tokens: toks, tree: tree };
           },
           getContentElement: function getCodeContent(block) {
             return renderNode("code", block.code.tree);
+          },
+          getContentText: function getTextContentText(block) {
+            return block.code.text;
           }
         }
       };
@@ -752,7 +760,10 @@
           var block = selectedBlock();
           var className = blockTypes[block.kind].contentClassName;
 
-          editElement(getPart(blockElement(block), className), 'editContent');
+          var element = getPart(blockElement(block), className);
+          element.innerText = blockTypes[block.kind].getContentText(block);
+
+          editElement(element, 'editContent');
         },
 
         insertCodeBlock: function insertCodeBlock() {
