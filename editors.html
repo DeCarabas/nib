@@ -1,5 +1,28 @@
 <!doctype html>
 <html>
+      <!--
+      TODO:
+
+      Language:
+        - Work on handling parse errors
+        - Parenthetical expressions
+        - SyntaxError expression
+        - Quoted identifiers
+        - Tabular data
+        - Metadata
+
+      Evaluator:
+        - Yes
+
+      Editor:
+        - Tree Motions (In, Out, Next, Prev)
+        - Tabular data
+        - Restricted tabular data for let bindings?
+        - Mode line for help
+        - Replace content-edit with textarea for code?
+        - Take an external editor?
+
+      -->
   <head>
     <title>Playing with Editors</title>
     <style type="text/css">
@@ -32,7 +55,7 @@
      var tokenType = {
        identifier: 1, numberLiteral: 2,
        equals: 100, arrow: 101, plus: 102, minus: 103, multiply: 104, divide: 105,
-       letKeyword: 200, fnKeyword: 201, inKeyword: 202, semicolon: 203,
+       letKeyword: 200, fnKeyword: 201, inKeyword: 202, semicolon: 203, ellipsis: 204,
        eof: 900, whitespace: 901, error: 999,
      };
      function tokenTypeName(type) {
@@ -56,6 +79,7 @@
          fnKeyword:  { type: tokenType.fnKeyword,  value: "fn",  length: 2, keyword: true },
          inKeyword:  { type: tokenType.inKeyword,  value: "in",  length: 2, keyword: true },
          semicolon:  { type: tokenType.semicolon,  value: ";",   length: 1 },
+         ellipsis:   { type: tokenType.ellipsis,   value: "...", length: 3 },
          eof:        { type: tokenType.eof,                      length: 0 }
        };
        function reservedWordLookup(identifier) {
@@ -230,6 +254,16 @@
                }
                break;
 
+             case /*.*/46:
+               if (offset+1 < limit &&
+                   text.charCodeAt(offset) === /*.*/46 &&
+                   text.charCodeAt(offset+1) === /*.*/46) {
+                     token = tokens.ellipsis;
+               } else {
+                 token = { type: tokenType.error, length: offset - startOffset, value: text.substring(startOffset, offset) };
+               }
+               break;
+
              case (code >= /*0*/48 && code <= /*9*/57) && code:
                token = readDecimalLiteralToken(text, startOffset, offset, limit);
                break;
@@ -269,6 +303,7 @@
      var nodeType = {
        apply: 1,identifier: 2,literal: 3,
        let: 100, fn: 101, binding: 102,
+       notimpl: 200,
        binaryOperator: 1000,
        syntaxError: 9000
      };
@@ -327,6 +362,10 @@
          return { type: nodeType.let, let: token, bindings: bindings, in_: in_, expr: expr, children: children };
        }
 
+       function parseNotImpl(token_stream, token) {
+         return { type: nodeType.notimpl, token: token };
+       }
+
        // Infix expressions
        function parseBinaryOperator(precedence) {
          return {
@@ -360,8 +399,10 @@
          { token: tokenType.numberLiteral, parser: parseLiteral },
          { token: tokenType.fnKeyword,     parser: parseFn },
          { token: tokenType.letKeyword,    parser: parseLet },
+         { token: tokenType.ellipsis,      parser: parseNotImpl },
        ];
 
+       // N.B.: Stealing precedence from F#, which has a syntax I admire.
        var precedence = {
          let:      2,
          fn:       3,
@@ -515,7 +556,7 @@
      function renderFnExpression(node) {
        var fnexp = createDiv("fnExpression");
 
-       fnexp.appendChild(renderKeyword("fn"));
+       fnexp.appendChild(renderKeyword("fn")); // For extra nerdy do \u03BB
        for (var i = 0; i < node.params.length; i++) {
          fnexp.appendChild(renderTextElement("decl", node.params[i].value));
        }
@@ -547,6 +588,10 @@
        return binopexp;
      }
 
+     function renderNotImpl(node) {
+       return renderTextElement("notImplExpression", "\u2026");
+     }
+
      function renderNode(name, node) {
        var container = createDiv(name);
        switch(node.type) {
@@ -556,6 +601,8 @@
          case nodeType.identifier: container.appendChild(renderIdentifierExpression(node)); break;
          case nodeType.literal: container.appendChild(renderLiteralExpression(node)); break;
          case nodeType.binaryOperator: container.appendChild(renderBinaryOperatorExpression(node)); break;
+         case nodeType.notimpl: container.appendChild(renderNotImpl(node)); break;
+         default: throw new Error("Missing handler for node type");
        }
        return container;
      }
