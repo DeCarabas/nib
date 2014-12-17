@@ -5,7 +5,6 @@
 
       Language:
         - Work on handling parse errors
-        - Parenthetical expressions
         - SyntaxError expression
         - Tabular data
         - Metadata
@@ -55,6 +54,7 @@
        identifier: 1, numberLiteral: 2,
        equals: 100, arrow: 101, plus: 102, minus: 103, multiply: 104, divide: 105,
        letKeyword: 200, fnKeyword: 201, inKeyword: 202, semicolon: 203, ellipsis: 204,
+       openParen: 300, closeParen: 301,
        eof: 900, whitespace: 901, error: 999,
      };
      function tokenTypeName(type) {
@@ -79,6 +79,8 @@
          inKeyword:   { type: tokenType.inKeyword,   value: "in",  length: 2, keyword: true },
          semicolon:   { type: tokenType.semicolon,   value: ";",   length: 1 },
          ellipsis:    { type: tokenType.ellipsis,    value: "...", length: 3 },
+         openParen:   { type: tokenType.openParen,   value: "(",   length: 1 },
+         closeParen:  { type: tokenType.closeParen,  value: ")",   length: 1 },
          eof:         { type: tokenType.eof,                       length: 0 }
        };
        function reservedWordLookup(identifier) {
@@ -269,6 +271,9 @@
                token = readWhitespaceToken(text, startOffset, offset, limit);
                break;
 
+             case /*(*/40: token = tokens.openParen; break;
+             case /*)*/41: token = tokens.closeParen; break;
+
              case /* * */42: token = tokens.multiply; break;
              case /* / */47: token = tokens.divide; break;
 
@@ -345,7 +350,7 @@
     <script type="text/javascript">
      // Parser.
      var nodeType = {
-       apply: 1,identifier: 2,literal: 3,
+       apply: 1,identifier: 2,literal: 3, paren: 4,
        let: 100, fn: 101, binding: 102,
        notimpl: 200,
        binaryOperator: 1000,
@@ -410,6 +415,12 @@
          return { type: nodeType.notimpl, token: token };
        }
 
+       function parseParenthetical(token_stream, tokens) {
+         var expr = parseExpression(token_stream, 0);
+         token_stream.read(tokenType.closeParen);
+         return { type: nodeType.paren, children: [ expr ] };
+       }
+
        // Infix expressions
        function parseBinaryOperator(precedence) {
          return {
@@ -444,6 +455,7 @@
          { token: tokenType.fnKeyword,     parser: parseFn },
          { token: tokenType.letKeyword,    parser: parseLet },
          { token: tokenType.ellipsis,      parser: parseNotImpl },
+         { token: tokenType.openParen,     parser: parseParenthetical },
        ];
 
        // N.B.: Stealing precedence from F#, which has a syntax I admire.
@@ -575,7 +587,7 @@
      function renderIdentifierToken(token) {
        if (token.quoted) {
          return '\u00AB' + token.value + '\u00BB';
-       } else {         
+       } else {
          return token.value;
        }
      }
@@ -616,6 +628,13 @@
        return fnexp;
      }
 
+     function renderParenthetical(node) {
+       var parexp = createDiv("parenExpression");
+       parexp.appendChild(renderTextElement("paren", "("));
+       parexp.appendChild(renderNode("parenValue", node.children[0]));
+       parexp.appendChild(renderTextElement("paren", ")"));
+       return parexp;
+     }
      function renderApplyExpression(node) {
        var applyexp = createDiv("applyExpression");
        applyexp.appendChild(renderNode("fn", node.fn));
@@ -653,6 +672,7 @@
          case nodeType.literal: container.appendChild(renderLiteralExpression(node)); break;
          case nodeType.binaryOperator: container.appendChild(renderBinaryOperatorExpression(node)); break;
          case nodeType.notimpl: container.appendChild(renderNotImpl(node)); break;
+         case nodeType.paren: container.appendChild(renderParenthetical(node)); break;
          default: throw new Error("Missing handler for node type");
        }
        return container;
