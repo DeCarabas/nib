@@ -7,7 +7,6 @@
         - Work on handling parse errors
         - Parenthetical expressions
         - SyntaxError expression
-        - Quoted identifiers
         - Tabular data
         - Metadata
 
@@ -69,18 +68,18 @@
      }
      var lex = (function() {
        var tokens = {
-         equals:     { type: tokenType.equals,     value: "=",   length: 1 },
-         arrow:      { type: tokenType.arrow,      value: "=>",  length: 2 },
-         plus:       { type: tokenType.plus,       value: "+",   length: 1 },
-         minus:      { type: tokenType.minus,      value: "-",   length: 1 },
-         multiply:   { type: tokenType.multiply,   value: "*",   length: 1 },
-         divide:     { type: tokenType.divide,     value: "/",   length: 1 },
-         letKeyword: { type: tokenType.letKeyword, value: "let", length: 3, keyword: true },
-         fnKeyword:  { type: tokenType.fnKeyword,  value: "fn",  length: 2, keyword: true },
-         inKeyword:  { type: tokenType.inKeyword,  value: "in",  length: 2, keyword: true },
-         semicolon:  { type: tokenType.semicolon,  value: ";",   length: 1 },
-         ellipsis:   { type: tokenType.ellipsis,   value: "...", length: 3 },
-         eof:        { type: tokenType.eof,                      length: 0 }
+         equals:      { type: tokenType.equals,      value: "=",   length: 1 },
+         arrow:       { type: tokenType.arrow,       value: "=>",  length: 2 },
+         plus:        { type: tokenType.plus,        value: "+",   length: 1 },
+         minus:       { type: tokenType.minus,       value: "-",   length: 1 },
+         multiply:    { type: tokenType.multiply,    value: "*",   length: 1 },
+         divide:      { type: tokenType.divide,      value: "/",   length: 1 },
+         letKeyword:  { type: tokenType.letKeyword,  value: "let", length: 3, keyword: true },
+         fnKeyword:   { type: tokenType.fnKeyword,   value: "fn",  length: 2, keyword: true },
+         inKeyword:   { type: tokenType.inKeyword,   value: "in",  length: 2, keyword: true },
+         semicolon:   { type: tokenType.semicolon,   value: ";",   length: 1 },
+         ellipsis:    { type: tokenType.ellipsis,    value: "...", length: 3 },
+         eof:         { type: tokenType.eof,                       length: 0 }
        };
        function reservedWordLookup(identifier) {
          switch (identifier.charCodeAt(0)) {
@@ -138,7 +137,48 @@
          var length = offset - start;
 
          var value = text.substr(start, length);
-         return reservedWordLookup(value) || { type: tokenType.identifier, length: length, value: value };
+         return reservedWordLookup(value) || { type: tokenType.identifier, length: length, value: value, quoted: false };
+       }
+       function readQuotedIdentifier(text, offset, limit) {
+         while (offset < limit) {
+           var code = text.charCodeAt(offset);
+           switch (code) {
+             case /*\*/92:
+               offset++;
+               if (offset < limit) {
+                 code = text.charCodeAt(offset);
+                 if (code != /*]*/93) {
+                   return -offset;
+                 }
+               }
+               break;
+             case /*]*/93:
+               return offset + 1;
+           }
+           offset++;
+         }
+         return -offset;
+       }
+       function readQuotedIdentifierToken(text, start, offset, limit) {
+         offset = readQuotedIdentifier(text, offset, limit);
+
+         var type = tokenType.identifier;
+         if (offset < 0) {
+           offset = -offset;
+           type = tokenType.error;
+         }
+         var length = offset - start;
+         if (length <= 2) {
+           type = tokenType.error;
+         }
+
+         var value;
+         if (type === tokenType.identifier) {
+           value = text.substr(start + 1, length - 2).replace(/\\/g, "");
+         } else {
+           value = text.substr(start, length);
+         }
+         return { type: type, length: length, value: value, quoted: true };
        }
        function isDecimalDigit(code) {
          return (code >= /*0*/48 && code <= /*9*/57) && code;
@@ -278,6 +318,10 @@
                } else {
                  token = tokens.equals;
                }
+               break;
+
+             case /*[*/91:
+               token = readQuotedIdentifierToken(text, startOffset, offset, limit);
                break;
 
              case isIdentifierStartCharacter(code) && code:
@@ -528,9 +572,17 @@
      function renderKeyword(value) { return renderTextElement("keyword", value); }
      function renderOperator(value) { return renderTextElement("operator", value); }
 
+     function renderIdentifierToken(token) {
+       if (token.quoted) {
+         return '\u00AB' + token.value + '\u00BB';
+       } else {         
+         return token.value;
+       }
+     }
+
      function renderBinding(node) {
        var binding = createDiv("binding");
-       binding.appendChild(renderTextElement("variable", node.decl.value));
+       binding.appendChild(renderTextElement("variable", renderIdentifierToken(node.decl)));
        binding.appendChild(renderOperator("="));
        binding.appendChild(renderNode("value", node.expr));
        return binding;
@@ -555,12 +607,11 @@
 
      function renderFnExpression(node) {
        var fnexp = createDiv("fnExpression");
-
        fnexp.appendChild(renderKeyword("fn")); // For extra nerdy do \u03BB
        for (var i = 0; i < node.params.length; i++) {
          fnexp.appendChild(renderTextElement("decl", node.params[i].value));
        }
-       fnexp.appendChild(renderKeyword("=>"));
+       fnexp.appendChild(renderKeyword("\u21d2")); // "=>"
        fnexp.appendChild(renderNode("body", node.body));
        return fnexp;
      }
@@ -573,7 +624,7 @@
      }
 
      function renderIdentifierExpression(node) {
-       return renderTextElement("identifierExpression", node.value.value);
+       return renderTextElement("identifierExpression", renderIdentifierToken(node.value));
      }
 
      function renderLiteralExpression(node) {
