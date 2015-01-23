@@ -56,7 +56,7 @@
       }
       break;
     }
-    return;
+    return null;
   }
 
   function isIdentifierStartCharacter(code) {

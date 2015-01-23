@@ -113,10 +113,10 @@
   // N.B.: Stealing precedence from F#, which has a syntax I admire.
   var precedence = {
     let:      2,
-        fn:       3,
-        add:      4,
-        multiply: 5,
-        apply:    6
+    fn:       3,
+    add:      4,
+    multiply: 5,
+    apply:    6
   };
 
   var infix_tokens = [
