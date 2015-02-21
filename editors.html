@@ -42,6 +42,8 @@
 
      .applyExpression .arg { margin-left: 5px; }
 
+     .syntaxError { border-bottom: 1px dotted red; }
+
      .selected { border: 1px solid blue; }
     </style>
   </head>
@@ -51,6 +53,7 @@
     <script type="text/javascript" src="lex.js"></script>
     <script type="text/javascript" src="parse.js"></script>
     <script type="text/javascript" src="render.js"></script>
+    <script type="text/javascript" src="compile.js"></script>
     <script type="text/javascript">
       // Block metadata
       //
@@ -71,6 +74,11 @@
           },
           getContentText: function getTextContentText(block) {
             return block.content;
+          },
+          getResultElement: function getTextResultElement(block) {
+            var resultElement = document.createElement('div');
+            resultElement.className = 'result';
+            return resultElement;
           }
         },
         'codeBlock': {
@@ -78,16 +86,40 @@
           setContent: function setCodeContent(block, text) {
             var toks = lex(text);
             var tree = parse(toks);
-            block.code = { text: text, tokens: toks, tree: tree };
+
+            block.code = { 
+              text: text, 
+              tokens: toks, 
+              tree: tree
+            };
           },
           getContentElement: function getCodeContent(block) {
             return renderNode("code", block.code.tree);
           },
-          getContentText: function getTextContentText(block) {
+          getContentText: function getCodeContentText(block) {
             return block.code.text;
+          },
+          getResultElement: function getCodeContentResult(block) {
+            var resultElement = document.createElement('div');
+            resultElement.className = 'result';
+            if (block.code.js) {
+              try
+              {
+                resultElement.innerText = eval(block.code.js);
+              }
+              catch(e)
+              {
+                resultElement.innerText = e;
+              }
+            }
+            return resultElement;
           }
         }
       };
+
+      function setBlockContent(block, text) {
+        blockTypes[block.kind].setContent(block, text);
+      }
 
       // Rendering and DOM structure
       //
@@ -99,12 +131,7 @@
         }
 
         var codeElement = blockTypes[block.kind].getContentElement(block);
-
-        var resultElement = document.createElement('div');
-        resultElement.className = 'result';
-        if (block.result) {
-          resultElement.innerText = block.result;
-        }
+        var resultElement = blockTypes[block.kind].getResultElement(block);
 
         var elem = document.createElement('div');
         elem.className = 'block';
@@ -226,15 +253,6 @@
         return newElem;
       }
 
-      function replaceBlockContent(block) {
-        var element = blockElement(block);
-        var type = blockTypes[block.kind];
-        var newElement = type.getContentElement(block);
-        var oldElement = getPart(element, type.contentClassName);
-
-        oldElement.parentNode.replaceChild(newElement, oldElement);
-      }
-
       var commands = {
         selectPrevious: function selectPrevious() { selectBlock(previousBlock(notebook, selectedBlock())); },
         selectNext:     function selectNext() { selectBlock(nextBlock(notebook, selectedBlock())); },
@@ -282,13 +300,14 @@
         'editContent': {
           'U+001B': /*ESC*/ function() { // ESC
             var block = attachedBlock(selectedElement);
-
             var type = blockTypes[block.kind];
             type.setContent(block, selectedElement.innerText);
-            var newContent = type.getContentElement(block);
+            
+            var newElem = renderBlock(block);
+            var oldElem = selectedElement.parentNode;
 
+            oldElem.parentNode.replaceChild(newElem, oldElem);
             selectBlock(block);
-            replaceBlockContent(block);
 
             mode = modes['select'];
           },
@@ -327,10 +346,6 @@
     </script>
     <script type="text/javascript">
      // The document
-     var text_one = 'let x = fn a b c d => a + b + c + d;\n    y = x 1 2;\n    in y 5';
-     var toks = lex(text_one);
-     var tree = parse(toks);
-
      var notebook = {
        blocks: [
          {
@@ -338,15 +353,8 @@
            content: '= This little notebook is a program.\n\nA notebook has text, like this, interspersed with code.\n\nHere\'s some code:'
          },
          {
-           // This is wrong because you really want to store the tree, of course.
            kind: 'codeBlock',
-           label: 'Function One',
-           code: {
-             text: text_one,
-             tokens: toks,
-             tree: tree
-           },
-           result: 'fn x : int -> int'
+           label: 'Function One'
          },
          {
            kind: 'textBlock',
@@ -354,6 +362,9 @@
          }
        ]
      };
+
+     var text_one = 'let x = fn a b c d => a + b + c + d;\n    y = x 1 2;\n    in y 5';
+     setBlockContent(notebook.blocks[1], text_one);
 
      renderNotebook(notebook);
     </script>

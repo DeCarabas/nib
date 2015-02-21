@@ -2,58 +2,62 @@
   // TODO: Should do much, much better.
 
   // JS generation
-  function escapeIdentifier(identifier) {
+  function escapeIdentifier(token) {
     // TODO: Escape identifiers
-    // return identifier;
+    return token.value;
   }
 
-  function jsInvoke(options) {
-    // fnexp
-    // args
+  function makeString(text) {
+    return "'" + text.replace("'", "\\'") + "'";
   }
 
-  function jsFunction(options) {
-    // args
-    // body
-    // name?
+  function jsInvoke(fnexp, args) {
+    return "((" + fnexp + ")(" + args.join() + "))";
   }
 
-  function jsLiteral(options) {
-    // value
+  function jsFunction(args, body, name) {
+    return "function "+(name||"")+"("+args.join()+"){"+body+"}";
   }
 
-  function jsThrow(options) {
-    // text
+  function jsLiteral(token) {
+    return token.value; // TODO: Better
+  }
+
+  function jsThrow(text) {
+    return "throw "+ makeString(text);
   }
 
   function jsAdd(left, right) {
+    return "(" + left + "+" + right + ")";
   }
 
   function jsSub(left, right) {
+    return "(" + left + "-" + right + ")";
   }
 
   function jsMul(left, right) {
+    return "(" + left + "*" + right + ")";
   }
 
   function jsDiv(left, right) {
+    return "(" + left + "/" + right + ")";
   }
 
   // AST -> JS conversion
 
   function compileApply(node) {
-    return jsInvoke({
-      fnexp: compileExpression(node.fn),
-      args: [ compileExpression(node.arg) ]
-    });
+    return jsInvoke(
+      compileExpression(node.fn),
+      [ compileExpression(node.arg) ]
+    );
   }
 
   function compileIdentifier(node) {
-    return escapeIdentifier(node.value.value);
+    return escapeIdentifier(node.value);
   }
 
   function compileLiteral(node) {
-    // TODO: Really translate literals.
-    return jsLiteral({ value: node.value.value });
+    return jsLiteral(node.value);
   }
 
   function compileParen(node) {
@@ -61,24 +65,24 @@
   }
 
   function compileLet(node) {
-    return jsInvoke({
-      fnexp: jsFunction({ 
-        args: node.bindings.map(function(b) { return escapeIdentifier(b.decl.value); }),
-        body: compileExpression(node.expr)
-      }),
-      args: node.bindings.map(function(b) { return compileExpression(b.expr); })
-    });
+    return jsInvoke(
+      jsFunction(
+        node.bindings.map(function(b) { return escapeIdentifier(b.decl); }),
+        compileExpression(node.expr)
+      ),
+      node.bindings.map(function(b) { return compileExpression(b.expr); })
+    );
   }
 
   function compileFn(node) {
-    return jsFunction({
-      args: node.params.map(function(p) { return escapeIdentifier(p); }),
-      body: compileExpression(node.body)
-    });
+    return jsFunction(
+      node.params.map(function(p) { return escapeIdentifier(p); }),
+      compileExpression(node.body)
+    );
   }
 
   function compileNotImpl(node) {
-    return jsThrow({ text: "Not Implemented" });
+    return jsThrow("Not Implemented");
   }
 
   function compileBinaryOperator(node) {
@@ -92,12 +96,12 @@
       case "-":  return jsSub(left, right);
       case "*":  return jsMul(left, right);
       case "/":  return jsDiv(left, right);
-      default:   return jsThrow({ text: "Uncompilable operator: " + node.op.value });
+      default:   return jsThrow("Uncompilable operator: " + node.op.value);
     }
   }
 
   function compileSyntaxError(node) {
-    return jsThrow({ text: "Syntax error" });
+    return jsThrow("Syntax error");
   }
 
   function compileExpression(node) {
@@ -111,7 +115,7 @@
       case nodeType.notimpl:        return compileNotImpl(node);
       case nodeType.binaryOperator: return compileBinaryOperator(node);
       case nodeType.syntaxError:    return compileSyntaxError(node);
-      default:                      return jsThrow({ text: "Unsupported node" });
+      default:                      return jsThrow("Unsupported node");
     }
   }
 

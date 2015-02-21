@@ -122,14 +122,17 @@
   function readQuotedIdentifierToken(text, start, offset, limit) {
     offset = readQuotedIdentifier(text, offset, limit);
 
+    var error;
     var type = tokenType.identifier;
     if (offset < 0) {
       offset = -offset;
       type = tokenType.error;
+      error = "Expected to find a ']' to close the quoted identifier.";
     }
     var length = offset - start;
     if (length <= 2) {
       type = tokenType.error;
+      error = "Empty quoted identifiers ('[]') are not allowed.";
     }
 
     var value;
@@ -138,7 +141,10 @@
     } else {
       value = text.substr(start, length);
     }
-    return { type: type, length: length, value: value, quoted: true };
+
+    var result = { type: type, length: length, value: value, quoted: true };
+    if (error) { result.error = error; }
+    return result;
   }
 
   function isDecimalDigit(code) {
@@ -243,27 +249,8 @@
       case /* * */42: token = tokens.multiply; break;
       case /* / */47: token = tokens.divide; break;
 
-      case /*+*/43:
-      case /*-*/45:
-        if (offset < limit) {
-          var afterSign = text.charCodeAt(offset);
-          if (afterSign === /*.*/46) {
-            var signOffset = offset + 1;
-            if (signOffset < limit && isDecimalDigit(text.charCodeAt(signOffset))) {
-              token = readDecimalLiteralToken(text, startOffset, signOffset, limit);
-              break;
-            }
-          } else if (isDecimalDigit(afterSign)) {
-            token = readDecimalLiteralToken(text, startOffset, offset, limit);
-            break;
-          }
-        }
-        if (code === /*+*/43) {
-          token = tokens.plus;
-        } else {
-          token = tokens.minus;
-        }
-        break;
+      case /*+*/43: token = tokens.plus; break;
+      case /*-*/45: token = tokens.minus; break;
 
       case /*.*/46:
         if (offset+1 < limit &&
@@ -271,7 +258,12 @@
             text.charCodeAt(offset+1) === /*.*/46) {
           token = tokens.ellipsis;
         } else {
-          token = { type: tokenType.error, length: offset - startOffset, value: text.substring(startOffset, offset) };
+          token = { 
+            type: tokenType.error, 
+            length: offset - startOffset, 
+            value: text.substring(startOffset, offset),
+            error: "Unrecognized symbol. (Did you mean '...'?)"
+          };
         }
         break;
 
@@ -301,7 +293,12 @@
 
       default:
         // TODO: Suppress duplicate error tokens; merge them together. Or resync on whitespace?
-        token = { type: tokenType.error, length: offset - startOffset, value: text.substring(startOffset, offset) };
+        token = { 
+          type: tokenType.error, 
+          length: offset - startOffset, 
+          value: text.substring(startOffset, offset),
+          error: "Unrecognized symbol. (Did you mean to quote this as an identifier, with '[]'?)"
+        };
         break;
       }
 

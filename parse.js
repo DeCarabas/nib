@@ -5,7 +5,7 @@
     apply: 1,identifier: 2,literal: 3, paren: 4,
     let: 100, fn: 101, binding: 102,
     notimpl: 200,
-    binaryOperator: 1000,
+    binaryOperator: 1000, unaryOperator: 1001,
     syntaxError: 9000
   };
   function nodeTypeName(type) {
@@ -25,6 +25,10 @@
 
   function parseLiteral(token_stream, token) {
     return { type: nodeType.literal, value: token };
+  }
+
+  function parseError(token_stream, token) {
+    return { type: nodeType.syntaxError, value: token };
   }
 
   function parseFn(token_stream, token) {
@@ -73,6 +77,13 @@
     return { type: nodeType.paren, children: [ expr ] };
   }
 
+  function parseUnaryOperator(precedence) {
+      return function parseUnaryImpl(token_stream, token) {
+        var expr = parseExpression(token_stream, precedence);
+        return { type: nodeType.unaryOperator, op: token, children: [ expr ] };
+      };
+  }
+
   // Infix expressions
   function parseBinaryOperator(precedence) {
     return {
@@ -101,15 +112,6 @@
     return table.reduce(function (p, c) { p[c.token] = c.parser; }, {});
   }
 
-  var prefix_tokens = [
-    { token: tokenType.identifier,    parser: parseIdentifier },
-    { token: tokenType.numberLiteral, parser: parseLiteral },
-    { token: tokenType.fnKeyword,     parser: parseFn },
-    { token: tokenType.letKeyword,    parser: parseLet },
-    { token: tokenType.ellipsis,      parser: parseNotImpl },
-    { token: tokenType.openParen,     parser: parseParenthetical },
-  ];
-
   // N.B.: Stealing precedence from F#, which has a syntax I admire.
   var precedence = {
     let:      2,
@@ -118,6 +120,18 @@
     multiply: 5,
     apply:    6
   };
+
+  var prefix_tokens = [
+    { token: tokenType.identifier,    parser: parseIdentifier },
+    { token: tokenType.numberLiteral, parser: parseLiteral },
+    { token: tokenType.fnKeyword,     parser: parseFn },
+    { token: tokenType.letKeyword,    parser: parseLet },
+    { token: tokenType.ellipsis,      parser: parseNotImpl },
+    { token: tokenType.openParen,     parser: parseParenthetical },
+    { token: tokenType.plus,          parser: parseUnaryOperator(precedence.add) },
+    { token: tokenType.minus,         parser: parseUnaryOperator(precedence.add) },
+    { token: tokenType.error,         parser: parseError }
+  ];
 
   var infix_tokens = [
     { token: tokenType.plus,     parser: parseBinaryOperator(precedence.add) },

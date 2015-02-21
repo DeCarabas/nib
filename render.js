@@ -80,6 +80,14 @@ function renderLiteralExpression(node) {
   return renderTextElement("literalExpression", node.value.value);
 }
 
+function renderSyntaxError(node) {
+  var element = renderTextElement("syntaxError", node.value.value);
+  if (node.value.error) {
+    element.title = node.value.error;
+  }
+  return element;
+}
+
 function renderBinaryOperatorExpression(node) {
   var binopexp = createDiv("binaryExpression");
   binopexp.appendChild(renderNode("left", node.children[0]));
@@ -103,6 +111,7 @@ function renderNode(name, node) {
   case nodeType.binaryOperator: container.appendChild(renderBinaryOperatorExpression(node)); break;
   case nodeType.notimpl: container.appendChild(renderNotImpl(node)); break;
   case nodeType.paren: container.appendChild(renderParenthetical(node)); break;
+  case nodeType.syntaxError: container.appendChild(renderSyntaxError(node)); break;
   default: throw new Error("Missing handler for node type");
   }
   return container;
