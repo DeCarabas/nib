@@ -77,7 +77,12 @@
   }
 
   function renderIdentifierExpression(node) {
-    return renderTextElement("identifierExpression", renderIdentifierToken(node.value));
+    var idexp = renderTextElement("identifierExpression", renderIdentifierToken(node.value));
+    if (node.bind_error) {
+      idexp.classList.add("bindError");
+      idexp.title = node.bind_error;
+    }
+    return idexp;
   }
 
   function renderLiteralExpression(node) {

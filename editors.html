@@ -42,7 +42,8 @@
 
      .applyExpression .arg { margin-left: 5px; }
 
-     .syntaxError { border-bottom: 1px dotted red; }
+     .syntaxError { border-bottom: 2px dotted red; }
+     .bindError { border-bottom: 2px dotted blue; }
 
      .selected { border: 1px solid blue; }
     </style>
@@ -52,6 +53,7 @@
     </div>
     <script type="text/javascript" src="lex.js"></script>
     <script type="text/javascript" src="parse.js"></script>
+    <script type="text/javascript" src="bind.js"></script>
     <script type="text/javascript" src="render.js"></script>
     <script type="text/javascript" src="compile.js"></script>
     <script type="text/javascript">
@@ -86,6 +88,7 @@
           setContent: function setCodeContent(block, text) {
             var toks = lex(text);
             var tree = parse(toks);
+            bindTree(tree);
 
             block.code = { 
               text: text, 
@@ -363,7 +366,7 @@
        ]
      };
 
-     var text_one = 'let x = fn a b c d => a + b + c + d;\n    y = x 1 2;\n    in y 5';
+     var text_one = 'let x = fn a b c d => a + b + c + d;\n    y = x 1 2;\n    in y 5 abba';
      setBlockContent(notebook.blocks[1], text_one);
 
      renderNotebook(notebook);
