@@ -1,6 +1,7 @@
 (function(global) {
-  // TODO: Should do much, much better.
+  var nodeType = global.nodeType;
 
+  // TODO: Should do much, much better.
   // JS generation
   function escapeIdentifier(token) {
     // TODO: Escape identifiers

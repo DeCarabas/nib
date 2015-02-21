@@ -1,6 +1,8 @@
 // Structured renderer
 (function(global) {
 
+  var nodeType = global.nodeType;
+
   function createDiv(className) {
     var result = document.createElement("div");
     result.classList.add(className);
