@@ -55,7 +55,7 @@
     var fnexp = createDiv("fnExpression");
     fnexp.appendChild(renderKeyword("fn")); // For extra nerdy do \u03BB
     for (var i = 0; i < node.params.length; i++) {
-      fnexp.appendChild(renderTextElement("decl", node.params[i].value));
+      fnexp.appendChild(renderTextElement("decl", node.params[i].id.value));
     }
     fnexp.appendChild(renderKeyword("\u21d2")); // "=>"
     fnexp.appendChild(renderNode("body", node.body));

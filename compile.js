@@ -77,7 +77,7 @@
 
   function compileFn(node) {
     return jsFunction(
-      node.params.map(function(p) { return escapeIdentifier(p); }),
+      node.params.map(function(p) { return escapeIdentifier(p.id); }),
       compileExpression(node.body)
     );
   }

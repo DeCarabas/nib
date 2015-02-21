@@ -1,9 +1,12 @@
 (function(global) {
 
+  var tokenType = global.tokenType;
+  var tokenTypeName = global.tokenTypeName;
+
   // Parser.
   var nodeType = {
     apply: 1,identifier: 2,literal: 3, paren: 4,
-    let: 100, fn: 101, binding: 102,
+    let: 100, fn: 101, fnArg: 102, letBinding: 103,
     notimpl: 200,
     binaryOperator: 1000, unaryOperator: 1001,
     syntaxError: 9000
@@ -34,11 +37,11 @@
   function parseFn(token_stream, token) {
     var params = [];
     while (token_stream.peek().type === tokenType.identifier) {
-      params.push(token_stream.read());
+      params.push({ type: nodeType.fnArg, id: token_stream.read() });
     }
     var arrow = token_stream.read(tokenType.arrow);
     var body = parseExpression(token_stream, precedence.fn);
-    return { type: nodeType.fn, params: params, arrow: arrow, body: body, children: [body] };
+    return { type: nodeType.fn, params: params, arrow: arrow, body: body, children: [ body ] };
   }
 
   function parseBindings(token_stream) {
@@ -51,7 +54,7 @@
       var equals = token_stream.read(tokenType.equals);
       var val = parseExpression(token_stream, precedence.let);
 
-      bindings.push({ type: nodeType.binding, decl: id, expr: val, equals: equals, children: [ val ] });
+      bindings.push({ type: nodeType.letBinding, decl: id, expr: val, equals: equals, children: [ val ] });
     } while(token_stream.peek().type === tokenType.semicolon);
 
     return bindings;
@@ -211,7 +214,7 @@
   function nodeName(node) {
     var name = nodeTypeName(node.type);
     if (node.params) {
-      name = node.params.reduce(function (p,c) { return p + " " + c.value; }, name);
+      name = node.params.reduce(function (p,c) { return p + " " + c.id.value; }, name);
     }
     if (node.op) { name += " " + node.op.value; }
     if (node.decl) { name += " " + node.decl.value + "="; }
@@ -219,21 +222,34 @@
     return name;
   }
 
-  function dumpTree(t) {
-    var name = nodeName(t);
-    if (t.children) {
-      console.group(name);
+  function walkTree(node, pre, post) {
+    if (pre) { pre(node); }
+    if (node.children) {
       var i = 0;
-      for (i = 0; i < t.children.length; i++) {
-        dumpTree(t.children[i]);
+      for (i = 0; i < node.children.length; i++) {
+        walkTree(node.children[i], pre, post);
       }
-      console.groupEnd(name);
-    } else {
-      console.log(name);
     }
+    if (post) { post(node); }
+  }
+
+  function dumpTree(t) {
+    walkTree(t, function pre(node) {
+      var name = nodeName(node);
+      if (node.children) {
+        console.group(name);
+      } else {
+        console.log(name);
+      }
+    }, function post(node) {
+      if (node.children) {
+        console.groupEnd(nodeName(node));
+      }
+    });
   }
 
   global.nodeType = nodeType;
   global.parse = parse;
+  global.walkTree = walkTree;
   global.dumpTree = dumpTree;
 })(this);
