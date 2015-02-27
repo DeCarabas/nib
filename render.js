@@ -69,6 +69,7 @@
     parexp.appendChild(renderTextElement("paren", ")"));
     return parexp;
   }
+
   function renderApplyExpression(node) {
     var applyexp = createDiv("applyExpression");
     applyexp.appendChild(renderNode("fn", node.fn));

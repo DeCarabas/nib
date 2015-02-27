@@ -3,13 +3,28 @@
   var nodeType = global.nodeType;
   var walkTree = global.walkTree;
 
+  var bindType = {
+    letBinding: 1,
+    paramBinding: 2
+  }
+
+  var symbolId = 0;
+
+  function genId() {
+    return symbolId++;
+  }
+
   function createSymbolTable(parent, node) {
     return {
+      scopeId: genId(),
       parent: parent,
       node: node,
       table: {},
+      addBinding: function addBinding(id, node) {
+        this.table[id] = { scope: this, node: node };
+      },
       lookup: function lookup(id) {
-        return this.table[id] || (this.parent
+        return table[id] || (this.parent
           ? this.parent.lookup(id)
           : null);
       }
@@ -28,23 +43,24 @@
   function bindFn(table, node) {
     var newTable = createSymbolTable(table, node);
     for (var i = 0; i < node.params.length; i++) {
-      table.table[node.params[i].id.value] = node.params[i];
+      var p = node.params[i];
+      newTable.addBinding(p.id.value, p[i]);
     }
+    node.scope = newTable;
     return newTable;
   }
 
   function bindLet(table, node) {
     var newTable = createSymbolTable(table, node);
-
     for (var i = 0; i < node.bindings.length; i++) {
-      table.table[node.bindings[i].decl.value] = node.bindings[i];
+      var b = node.bindins[i];
+      newTable.addBinding(b.decl.value, b);
     }
-
+    node.scope = newTable;
     return newTable;
   }
 
   function bindTree(tree, globalTable) {
-
     var table = createSymbolTable(globalTable);
 
     walkTree(tree,
