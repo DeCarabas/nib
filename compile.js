@@ -3,129 +3,234 @@
 
   // TODO: Should do much, much better.
 
-  // JS generation
-  // TODO: Should I make a tree form for the JS? Or is that just dumb? It would
-  //       allow me to pretty-print the results of compilation, which will make
-  //       debugging that much easier. (Also maybe the source map?)
+  // Pretty-printing.
+  function createPrettyPrinter() {
+    return {
+      indent: 0,
+      buffer: '',
+      isIndented: false,
 
+      clear: function() {
+        this.buffer = '';
+        this.indent = 0;
+      },
+
+      _writeNewLine: function() {
+        this.buffer += '\n';
+        this.isIndented = false;
+      },
+
+      _writeValue: function(value) {
+        var parts = value.toString().split('\n');
+        for(var i = 0; i < parts.length; i++) {
+          if (i != 0) { this._writeNewLine(); }
+          if (!this.isIndented && (parts[i].length > 0)) { 
+            for (var j = 0; j < this.indent; j++) {
+              this.buffer += '  ';
+            }
+            this.isIndented = true;
+          }
+          this.buffer += parts[i];
+        }
+      },
+
+      write: function() {
+        for(var i = 0; i < arguments.length; i++) {
+          var value = arguments[i];
+          if (typeof(value) === "function") {
+            value(this);
+          } else if (Array.isArray(value)) {
+            this.write.apply(this, value);
+          } else {
+            this._writeValue(value);
+          }
+        }        
+      },
+
+      writeLine: function() {
+        this.write.apply(this, arguments);
+        this._writeNewLine();
+      },
+
+      withIndent: function(f) {
+        this.indent++; 
+        try {
+          f(); 
+        } finally {
+          this.indent--;
+        }
+      }
+    };
+  }
+
+  // JS generation
   function escapeIdentifier(value) {
     // TODO: Escape identifiers
     return value;
   }
 
   function jsString(text) {
-    return "'" + text.replace("'", "\\'") + "'";
+    return function writeString(writer) {
+      writer.write("'" + text.replace("'", "\\'") + "'");
+    };
   }
 
-  function jsLiteral(token) {
-    return token.value; // TODO: Better
+  function jsNumber(val) {
+    return function writeNumber(writer) {
+      writer.write(val); // TODO: Better
+    };
   }
 
   function jsThrow(value) {
-    return "throw "+ value;
+    return function writeThrow(writer) {
+      writer.write("throw ", value);
+    };
   }
 
   function jsInvoke(func, args) {
     // func is the function expression to invoke; rest of the args are the
     // args to the function.
-    var result = "(" + func + ")(";
-    if (args) {
-      result += args.join();
-    }
-    result += ")";
-
-    return result;
+    return function writeInvoke(writer) {
+      writer.write("(", func, ")(");
+      if (args && args.length) {
+        writer.withIndent(function() {
+          for(var i = 0; i < args.length; i++) {
+            if (i != 0) { writer.write(", "); }
+            writer.write(args[i]);
+          }
+        });
+      }
+      writer.write(")");
+    };
   }
 
   function jsFunction(args, statements, name) {
-    // args is an array of parameter names, statements is list of statements, name is optional name.
-    var result = "function " + (name || "") + " (" + (args || []).join() + "){";
-
-    var i;
-    for (i = 0; i < statements.length; i++) {
-      result += statements[i] + ";";
-    }
-    result += "}";
-
-    return result;
+    // args is an array of parameter names, statements is list of statements,
+    // name is optional name.
+    return function writeFunction(writer) {
+      writer.write("function ", (name || ""), "(");
+      (args || []).forEach(function (a, i) {
+        if (i != 0) { writer.write(", "); }
+        writer.write(a);
+      });
+      writer.writeLine("){");
+      writer.withIndent(function (){
+        (statements || []).forEach(function (s) {
+          writer.writeLine(s, ";");
+        });
+      });
+      writer.write("}");
+    };
   }
 
   function jsVar(name, value) {
-    var result = "var " + name;
-    if (value) { result += " = " + value; }
-    return result;
+    return function writeVar(writer) {
+      writer.write("var " + name);
+      if (value) { writer.write(" = ", value); }
+    };
   }
 
   function jsReturn(expr) {
-    return "return (" + expr + ")";
+    return function writeReturn(writer) {
+      writer.write("return (", expr, ")");
+    };
   }
 
-  function jsObject() {
-    // arguments are fields of the object.
-    var argsArray = Array.prototype.slice.call(arguments, 0);
-    return "{" + argsArray.join() + "}";
+  function jsObject(fields) {
+    return function writeObject(writer) {
+      writer.writeLine("{");
+      writer.withIndent(function() {
+        fields.forEach(function(a, i){
+          if (i != 0) { writer.writeLine(","); }
+          writer.write(a);
+        });
+        writer.writeLine();
+      });
+      writer.write("}");
+    };
   }
 
   function jsField(name, value) {
-    return name + ":" + value;
+    return function writeField(writer) {
+      writer.write(name, ": ", value);
+    };
   }
 
   function jsFalse() {
-    return 'false';
+    return function writeFalse(writer) {
+      writer.write('false');
+    };
   }
 
   function jsUndefined() {
-    return 'undefined';
+    return function writeUndefined(writer) {
+      writer.write('undefined');
+    };
+  }
+
+  function jsNull() {
+    return function writeUndefined(writer) {
+      writer.write('null');
+    };
   }
 
   function jsIf(condition, thenBranch, elseBranch) {
-    var result = 'if (' + condition + '){' + thenBranch.join(';') + '}';
-    if (elseBranch) {
-      result += ' else {' + elseBranch.join(';') + '}';
-    }
+    return function writeIf(writer) {
+      writer.writeLine('if (', condition, ') {');
+      writer.withIndent(function() {
+        (thenBranch || []).forEach(function(s) {
+          writer.writeLine(s, ";");
+        });
+      });
+      writer.write("}");
+      if (elseBranch) {
+        writer.writeLine(" else {");
+        writer.withIndent(function() {
+          elseBranch.forEach(function(s) {
+            writer.writeLine(s, ";");
+          });
+        });
+      }
+    };
   }
 
   function jsAssign(lval, rval) {
-    return lval + ' = ' + rval;
-  }
-
-  function jsId(val) {
-    return escapeIdentifier(val);
-  }
-
-  function jsTripleEq(left, right) {
-    return "(" + left + " === " + right + ")";
-  }
-
-  function jsAdd(left, right) {
-    return "(" + left + " + " + right + ")";
-  }
-
-  function jsSub(left, right) {
-    return "(" + left + " - " + right + ")";
-  }
-
-  function jsMul(left, right) {
-    return "(" + left + " * " + right + ")";
-  }
-
-  function jsDiv(left, right) {
-    return "(" + left + " / " + right + ")";
+    return function writeAssign(writer) {
+      writer.write(lval, ' = ', rval);
+    };
   }
 
   function jsDot(left, right) {
-    return left + "." + right;
+    return function writeDiv(writer) {
+      writer.write(left, ".", right);
+    };
   }
 
-  function jsLessThan(left, right) {
-    return "(" + left + " < " + right + ")";
+  function jsId(val) {
+    return function writeId(writer) {
+      writer.write(escapeIdentifier(val));
+    };
   }
 
+  function _jsBinOp(op) {
+    return function(left, right) {
+      return function(writer) {
+        writer.write("(", left, " ", op, " ", right, ")");
+      };
+    };
+  };
+
+  var jsTripleEq = _jsBinOp("===");
+  var jsAdd      = _jsBinOp("+");
+  var jsSub      = _jsBinOp("-");
+  var jsMul      = _jsBinOp("*");
+  var jsDiv      = _jsBinOp("/");
+  var jsLessThan = _jsBinOp("<");
 
   // AST -> JS conversion
 
   function compileThrowLiteral(value) {
-    return jsInvoke(jsFunction([], [ jsThrow(jsString(value) ])));
+    return jsInvoke(jsFunction([], [ jsThrow(jsString(value)) ]));
   }
 
   function compileEvalOnceProperty(expression) {
@@ -133,7 +238,7 @@
       jsFunction([], [
         jsVar('__m_v', jsUndefined()),
         jsReturn(
-          jsObject(
+          jsObject([
             jsField('enumerable', jsFalse()),
             jsField('get', jsFunction([], [
               jsIf(
@@ -141,7 +246,8 @@
                 [
                   jsAssign(jsId('__m_v'), compileExpression(expression))
                 ]),
-              jsReturn(jsId('__m_v'))]))))
+              jsReturn(jsId('__m_v'))]))
+          ]))
         ]));
   }
 
@@ -193,7 +299,7 @@
   }
 
   function compileLiteral(node) {
-    return jsLiteral(node.value);
+    return jsNumber(node.value.value);
   }
 
   function compileParen(node) {
@@ -218,10 +324,10 @@
 
   function compileFn(node) {
     return jsFunction(
-      node.params.map(function(p) { return jsId(p.id); }),
+      node.params.map(function(p) { return jsId(p.id.value); }),
       [
         jsIf(
-          jsLessThan(jsDot(jsId('arguments'), jsId('count')), jsLiteral(node.params.length)),
+          jsLessThan(jsDot(jsId('arguments'), jsId('length')), jsNumber(node.params.length)),
           [
             jsVar('__capturedArgs', jsInvoke(jsId('Array.prototype.slice.call'), [
               jsId('arguments'), '0'
@@ -230,11 +336,12 @@
               [],
               [
                 jsVar('__newArgs', jsInvoke(jsId('Array.prototype.slice.call'), [
-                  jsId('arguments'), '0'
+                  jsId('arguments'), jsNumber('0')
                 ])),
-                jsInvoke(jsId('__f_full.call'),[
+                jsReturn(jsInvoke(jsId('__f_full.apply'),[
+                  jsNull(),
                   jsInvoke(jsId('__capturedArgs.concat'),[ jsId('__newArgs') ])
-                ])
+                ]))
               ],
               '__f_curried'))
           ]
@@ -283,5 +390,11 @@
     }
   }
 
-  global.compile = compileExpression;
+  function compile(node) {
+    var writer = createPrettyPrinter();
+    writer.write(compileExpression(node));
+    return writer.buffer;
+  }
+
+  global.compile = compile;
 })(this);
