@@ -76,6 +76,8 @@
           table = table.parent;
         }
       });
+
+    return tree;
   }
 
   global.bindTree = bindTree;
