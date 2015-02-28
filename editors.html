@@ -89,11 +89,13 @@
             var toks = lex(text);
             var tree = parse(toks);
             bindTree(tree);
+            var js = compile(tree);
 
-            block.code = { 
-              text: text, 
-              tokens: toks, 
-              tree: tree
+            block.code = {
+              text: text,
+              tokens: toks,
+              tree: tree,
+              js: js
             };
           },
           getContentElement: function getCodeContent(block) {
@@ -305,7 +307,7 @@
             var block = attachedBlock(selectedElement);
             var type = blockTypes[block.kind];
             type.setContent(block, selectedElement.innerText);
-            
+
             var newElem = renderBlock(block);
             var oldElem = selectedElement.parentNode;
 
