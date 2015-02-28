@@ -24,7 +24,7 @@
         this.table[id] = { scope: this, node: node };
       },
       lookup: function lookup(id) {
-        return table[id] || (this.parent
+        return this.table[id] || (this.parent
           ? this.parent.lookup(id)
           : null);
       }
@@ -44,7 +44,7 @@
     var newTable = createSymbolTable(table, node);
     for (var i = 0; i < node.params.length; i++) {
       var p = node.params[i];
-      newTable.addBinding(p.id.value, p[i]);
+      newTable.addBinding(p.id.value, p);
     }
     node.scope = newTable;
     return newTable;
@@ -53,7 +53,7 @@
   function bindLet(table, node) {
     var newTable = createSymbolTable(table, node);
     for (var i = 0; i < node.bindings.length; i++) {
-      var b = node.bindins[i];
+      var b = node.bindings[i];
       newTable.addBinding(b.decl.value, b);
     }
     node.scope = newTable;
