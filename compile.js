@@ -258,11 +258,17 @@
   }
 
   function compileApply(node) {
-    // TODO: Functions really need to handle currying; this does not do that.
-    return jsInvoke(
-      compileExpression(node.fn),
-      [ compileExpression(node.arg) ]
-    );
+    // Gotta dig deep.
+    var args = [];
+    while(node.type === nodeType.apply) {
+      args.push(compileExpression(node.arg));
+      node = node.fn;
+    }
+
+    // Now node points at the bottom FN, we gathered args backwards.
+    args.reverse();
+
+    return jsInvoke(compileExpression(node), args);
   }
 
   function getScopeName(scope) {
