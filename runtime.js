@@ -7,14 +7,18 @@
     // function accepts the remaining parameters.
     //
     addCurrySupport: function addCurrySupport(f) {
-      return function curriedFunction() {
+      var curried = function curriedFunction() {
         if (arguments.length < f.length) {
           var capturedArgs = Array.prototype.slice.call(arguments, 0);
-          return Function.prototype.bind.apply(curriedFunction, [null].concat(capturedArgs));
+          var result = Function.prototype.bind.apply(curriedFunction, [null].concat(capturedArgs));
+          result.toString = function() { return "(" + f.toString() + ")(" + capturedArgs.toString() + ")"; };
+          return result;
         }
 
         return f.apply(null, arguments);
       };
+      curried.toString = function() { return f.toString(); };
+      return curried;
     }
 
   };
