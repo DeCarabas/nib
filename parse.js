@@ -1,4 +1,5 @@
 (function(global) {
+  "use strict";
 
   var tokenType = global.tokenType;
   var tokenTypeName = global.tokenTypeName;

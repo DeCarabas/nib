@@ -1,4 +1,5 @@
 (function(global) {
+  "use strict";
 
   var nodeType = global.nodeType;
   var walkTree = global.walkTree;
@@ -6,7 +7,7 @@
   var bindType = {
     letBinding: 1,
     paramBinding: 2
-  }
+  };
 
   var symbolId = 0;
 

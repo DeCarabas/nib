@@ -1,4 +1,6 @@
 (function(global) {
+  "use strict";
+
   var nodeType = global.nodeType;
 
   // TODO: Should do much, much better.

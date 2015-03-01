@@ -1,5 +1,6 @@
 // Structured renderer
 (function(global) {
+  "use strict";
 
   var nodeType = global.nodeType;
 

@@ -1,4 +1,6 @@
 (function(global) {
+  "use strict";
+
   global.nib = (global.nib || {});
   global.nib.runtime = {
 
