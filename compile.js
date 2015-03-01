@@ -156,23 +156,17 @@
     };
   }
 
-  function jsFalse() {
-    return function writeFalse(writer) {
-      writer.write('false');
+  function _jsLiteral(value) {
+    return function() {
+      return function writeFalse(writer) {
+        writer.write(value);
+      };
     };
   }
 
-  function jsUndefined() {
-    return function writeUndefined(writer) {
-      writer.write('undefined');
-    };
-  }
-
-  function jsNull() {
-    return function writeUndefined(writer) {
-      writer.write('null');
-    };
-  }
+  var jsFalse     = _jsLiteral('false');
+  var jsUndefined = _jsLiteral('undefined');
+  var jsNull      = _jsLiteral('null');
 
   function jsIf(condition, thenBranch, elseBranch) {
     return function writeIf(writer) {
@@ -322,34 +316,29 @@
       ]));
   }
 
+  // This function wraps another function and adds auto-curry support to it,
+  // so if the function is called with too few parameters, we return a
+  // function accepts the remaining parameters.
+  //
+  function supportCurry(f) {
+    return function curriedFunction() {
+      if (arguments.length < f.length) {
+        var capturedArgs = Array.prototype.slice.call(arguments, 0);
+        return Function.prototype.bind.apply(curriedFunction, [null].concat(capturedArgs));
+      }
+
+      return f.apply(null, arguments);
+    };
+  }
+
   function compileFn(node) {
-    return jsFunction(
-      node.params.map(function(p) { return jsId(p.id.value); }),
+    return jsInvoke(
+      jsId('nib.runtime.addCurrySupport'),
       [
-        jsIf(
-          jsLessThan(jsDot(jsId('arguments'), jsId('length')), jsNumber(node.params.length)),
-          [
-            jsVar('__capturedArgs', jsInvoke(jsId('Array.prototype.slice.call'), [
-              jsId('arguments'), '0'
-            ])),
-            jsReturn(jsFunction(
-              [],
-              [
-                jsVar('__newArgs', jsInvoke(jsId('Array.prototype.slice.call'), [
-                  jsId('arguments'), jsNumber('0')
-                ])),
-                jsReturn(jsInvoke(jsId('__f_full.apply'),[
-                  jsNull(),
-                  jsInvoke(jsId('__capturedArgs.concat'),[ jsId('__newArgs') ])
-                ]))
-              ],
-              '__f_curried'))
-          ]
-        ),
-        jsReturn(compileExpression(node.body))
-      ],
-      '__f_full'
-    );
+        jsFunction(
+          node.params.map(function(p) { return jsId(p.id.value); }),
+          [ jsReturn(compileExpression(node.body)) ])
+      ]);
   }
 
   function compileNotImpl(node) {
