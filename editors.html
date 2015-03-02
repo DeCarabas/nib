@@ -4,16 +4,31 @@
       TODO:
 
       Language:
+        - Record expression
+        - Dot notation (I think application is always dorky; maybe x("y"), but I like 'x.y' best.)
+        - Array expression
+        - Indexer notation 
+
+             This one is odd; x(1)? But that's ambiguous with x (1) given our application syntax. Maybe x.1 or 
+             something? Multiple subs become problematic, though; x.1.1 will parse as x.(1.1); we need to then 
+             x.1.(1) which is bizarre. Maybe x.(1).(1) doesn't look terrible? I don't know. Subscripts would be 
+             nice too, though; maybe somebody has a nice textual rep for subscripts? Tex uses _{1} which might be nice,
+             actually; a _{ operator is not too bad, and x_{1} isn't so bad... maybe use that for records too. x_{foo} ?
+             Note that the value in _{ is quoted, so do we support expressions or not? x_{'foo'} ? x.foo ? x[foo] ?
+             (Clashes with our quoted identifier problem.)
+
         - Work on handling parse errors
-        - SyntaxError expression
         - Tabular data
         - Metadata
 
       Evaluator:
-        - Yes
+        - Web-worker runtime
+        - More better JS compilation
 
       Editor:
+        - Represent the whole notebook as an expression in the language
         - Tree Motions (In, Out, Next, Prev)
+        - Incremental editing-- parse and patch and fix the trees!
         - Tabular data
         - Restricted tabular data for let bindings?
         - Mode line for help
