@@ -71,6 +71,21 @@
     return parexp;
   }
 
+  function renderRecordField(node) {
+    var field  = createDiv("recordField");
+    field.appendChild(renderTextElement("fieldName", renderIdentifierToken(node.decl)));
+    field.appendChild(renderNode("fieldValue", node.expr));
+    return field;
+  }
+
+  function renderRecord(node) {
+    var record = createDiv("recordExpression");
+    for(var i = 0; i < node.children.length; i++) {
+      record.appendChild(renderRecordField(node.children[i]));
+    }
+    return record;
+  }
+
   function renderApplyExpression(node) {
     var applyexp = createDiv("applyExpression");
     applyexp.appendChild(renderNode("fn", node.fn));
@@ -122,6 +137,7 @@
     case nodeType.binaryOperator: container.appendChild(renderBinaryOperatorExpression(node)); break;
     case nodeType.notimpl: container.appendChild(renderNotImpl(node)); break;
     case nodeType.paren: container.appendChild(renderParenthetical(node)); break;
+    case nodeType.record: container.appendChild(renderRecord(node)); break;
     case nodeType.syntaxError: container.appendChild(renderSyntaxError(node)); break;
     default: throw new Error("Missing handler for node type");
     }

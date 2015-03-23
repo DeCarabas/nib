@@ -4,14 +4,13 @@
       TODO:
 
       Language:
-        - Record expression
         - Dot notation (I think application is always dorky; maybe x("y"), but I like 'x.y' best.)
         - Array expression
-        - Indexer notation 
+        - Indexer notation
 
-             This one is odd; x(1)? But that's ambiguous with x (1) given our application syntax. Maybe x.1 or 
-             something? Multiple subs become problematic, though; x.1.1 will parse as x.(1.1); we need to then 
-             x.1.(1) which is bizarre. Maybe x.(1).(1) doesn't look terrible? I don't know. Subscripts would be 
+             This one is odd; x(1)? But that's ambiguous with x (1) given our application syntax. Maybe x.1 or
+             something? Multiple subs become problematic, though; x.1.1 will parse as x.(1.1); we need to then
+             x.1.(1) which is bizarre. Maybe x.(1).(1) doesn't look terrible? I don't know. Subscripts would be
              nice too, though; maybe somebody has a nice textual rep for subscripts? Tex uses _{1} which might be nice,
              actually; a _{ operator is not too bad, and x_{1} isn't so bad... maybe use that for records too. x_{foo} ?
              Note that the value in _{ is quoted, so do we support expressions or not? x_{'foo'} ? x.foo ? x[foo] ?
@@ -56,6 +55,11 @@
      .decl { margin-left: 3px; }
 
      .applyExpression .arg { margin-left: 5px; }
+     .code div .recordExpression { display: inline-table; border: 1px solid black; margin: 3px 3px 3px 3px; padding-bottom: -1px; }
+     .code div .recordField { display: table-row; }
+     .code div .recordField:nth-child(even) { background-color: #EEE; }
+     .code div .fieldName { display: table-cell; border-bottom: 1px dotted black; padding-left: 3px; font-style: italic; }
+     .code div .fieldValue { display: table-cell; border-bottom: 1px dotted black; padding-left: 10px; padding-right: 3px; }
 
      .syntaxError { border-bottom: 2px dotted red; }
      .bindError { border-bottom: 2px dotted blue; }
@@ -384,7 +388,7 @@
        ]
      };
 
-     var text_one = 'let x = fn a b c d => a + b + c + d;\n    y = x 1 2;\n    in y 5';
+     var text_one = 'let x = fn a b c d => a + b + c + d;\n    y = x 1 2;\n    z = { john=5; bob=7; }\n    in y 5';
      setBlockContent(notebook.blocks[1], text_one);
 
      renderNotebook(notebook);

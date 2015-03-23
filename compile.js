@@ -26,7 +26,7 @@
         var parts = value.toString().split('\n');
         for(var i = 0; i < parts.length; i++) {
           if (i != 0) { this._writeNewLine(); }
-          if (!this.isIndented && (parts[i].length > 0)) { 
+          if (!this.isIndented && (parts[i].length > 0)) {
             for (var j = 0; j < this.indent; j++) {
               this.buffer += '  ';
             }
@@ -46,7 +46,7 @@
           } else {
             this._writeValue(value);
           }
-        }        
+        }
       },
 
       writeLine: function() {
@@ -55,9 +55,9 @@
       },
 
       withIndent: function(f) {
-        this.indent++; 
+        this.indent++;
         try {
-          f(); 
+          f();
         } finally {
           this.indent--;
         }
@@ -321,6 +321,24 @@
 
         // Return the result of the body.
         jsReturn(compileExpression(node.expr))
+      ]));
+  }
+
+  function compileRecord(node) {
+    var scopeName = getScopeName(node.scope);
+
+    // Invoking an anonymous object for scoping purposes...
+    return jsInvoke(
+      jsFunction([],[
+        // Declare a record-value variable that will be accessed by the expressions
+        // in the object bindings.
+        jsVar(scopeName, compileRecordObject(
+          node.bindings.map(function (b) {
+            return { name: b.decl, expr: b.expr };
+          }))),
+
+        // Just return the object, which is the same as the scope name.
+        jsReturn(jsId(scopeName))
       ]));
   }
 

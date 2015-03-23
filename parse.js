@@ -7,7 +7,7 @@
   // Parser.
   var nodeType = {
     apply: 1,identifier: 2,literal: 3, paren: 4,
-    let: 100, fn: 101, fnArg: 102, letBinding: 103,
+    let: 100, fn: 101, fnArg: 102, letBinding: 103, record: 104,
     notimpl: 200,
     binaryOperator: 1000, unaryOperator: 1001,
     syntaxError: 9000
@@ -33,6 +33,21 @@
 
   function parseError(token_stream, token) {
     return { type: nodeType.syntaxError, value: token };
+  }
+
+  function parseRecord(token_stream, token) {
+    var bindings = [];
+    while (token_stream.peek().type !== tokenType.closeCurly) {
+      var id = token_stream.read(tokenType.identifier);
+      var equals = token_stream.read(tokenType.equals);
+      var val = parseExpression(token_stream, precedence.record);
+      token_stream.read(tokenType.semicolon);
+
+      bindings.push({type: nodeType.letBinding, decl: id, expr: val, equals: equals, children: [ val ] });
+    }
+    var close = token_stream.read(tokenType.closeCurly);
+
+    return { type: nodeType.record, open: token, close: close, children: bindings };
   }
 
   function parseFn(token_stream, token) {
@@ -119,6 +134,7 @@
   // N.B.: Stealing precedence from F#, which has a syntax I admire.
   var precedence = {
     let:      2,
+    record:   2,
     fn:       3,
     add:      4,
     multiply: 5,
@@ -130,6 +146,7 @@
     { token: tokenType.numberLiteral, parser: parseLiteral },
     { token: tokenType.fnKeyword,     parser: parseFn },
     { token: tokenType.letKeyword,    parser: parseLet },
+    { token: tokenType.openCurly,     parser: parseRecord },
     { token: tokenType.ellipsis,      parser: parseNotImpl },
     { token: tokenType.openParen,     parser: parseParenthetical },
     { token: tokenType.plus,          parser: parseUnaryOperator(precedence.add) },

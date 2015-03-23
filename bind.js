@@ -61,6 +61,16 @@
     return newTable;
   }
 
+  function bindRecord(table, node) {
+    var newTable = createSymbolTable(table, node);
+    for (var i = 0; i < node.children.length; i++) {
+      var c = node.children[i];
+      newTable.addBinding(c.decl.value, c);
+    }
+    node.scope = newTable;
+    return newTable;
+  }
+
   function bindTree(tree, globalTable) {
     var table = createSymbolTable(globalTable);
 
@@ -70,6 +80,7 @@
         case nodeType.identifier: bindIdentifier(table, node); break;
         case nodeType.fn: table = bindFn(table, node); break;
         case nodeType.let: table = bindLet(table, node); break;
+        case nodeType.record: table = bindRecord(table, node); break;
         }
       },
       function bindNodePost(node) {

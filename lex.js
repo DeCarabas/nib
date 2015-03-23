@@ -6,7 +6,7 @@
     identifier: 1, numberLiteral: 2,
     equals: 100, arrow: 101, plus: 102, minus: 103, multiply: 104, divide: 105,
     letKeyword: 200, fnKeyword: 201, inKeyword: 202, semicolon: 203, ellipsis: 204,
-    openParen: 300, closeParen: 301,
+    openParen: 300, closeParen: 301, openCurly: 302, closeCurly: 303,
     eof: 900, whitespace: 901, error: 999,
   };
 
@@ -34,6 +34,8 @@
     ellipsis:    { type: tokenType.ellipsis,    value: "...", length: 3 },
     openParen:   { type: tokenType.openParen,   value: "(",   length: 1 },
     closeParen:  { type: tokenType.closeParen,  value: ")",   length: 1 },
+    openCurly:   { type: tokenType.openCurly,   value: "{",   length: 1 },
+    closeCurly:  { type: tokenType.closeCurly,  value: "}",   length: 1 },
     eof:         { type: tokenType.eof,                       length: 0 }
   };
 
@@ -227,7 +229,7 @@
 
     return { type: tokenType.whitespace, length: length, value: text.substr(start, length) };
   }
-  
+
   function lex(text, offset, limit) {
     offset = offset || 0;
     limit = limit || text.length;
@@ -250,6 +252,9 @@
       case /* * */42: token = tokens.multiply; break;
       case /* / */47: token = tokens.divide; break;
 
+      case /* { */123: token = tokens.openCurly; break;
+      case /* } */125: token = tokens.closeCurly; break;
+
       case /*+*/43: token = tokens.plus; break;
       case /*-*/45: token = tokens.minus; break;
 
@@ -259,9 +264,9 @@
             text.charCodeAt(offset+1) === /*.*/46) {
           token = tokens.ellipsis;
         } else {
-          token = { 
-            type: tokenType.error, 
-            length: offset - startOffset, 
+          token = {
+            type: tokenType.error,
+            length: offset - startOffset,
             value: text.substring(startOffset, offset),
             error: "Unrecognized symbol. (Did you mean '...'?)"
           };
@@ -294,9 +299,9 @@
 
       default:
         // TODO: Suppress duplicate error tokens; merge them together. Or resync on whitespace?
-        token = { 
-          type: tokenType.error, 
-          length: offset - startOffset, 
+        token = {
+          type: tokenType.error,
+          length: offset - startOffset,
           value: text.substring(startOffset, offset),
           error: "Unrecognized symbol. (Did you mean to quote this as an identifier, with '[]'?)"
         };
