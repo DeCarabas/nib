@@ -2,6 +2,7 @@
   "use strict";
 
   var nodeType = global.nodeType;
+  var tokenType = global.tokenType;
 
   // TODO: Should do much, much better.
 
@@ -67,7 +68,7 @@
 
   // JS generation
   function escapeIdentifier(value) {
-    // TODO: Escape identifiers
+    // TODO: Escape identifiers? When you do this, modify callers with '.' below.
     return value;
   }
 
@@ -231,20 +232,10 @@
 
   function compileEvalOnceProperty(expression) {
     return jsInvoke(
-      jsFunction([], [
-        jsVar('__m_v', jsUndefined()),
-        jsReturn(
-          jsObject([
-            jsField('enumerable', jsFalse()),
-            jsField('get', jsFunction([], [
-              jsIf(
-                jsTripleEq(jsId('__m_v'), jsUndefined()),
-                [
-                  jsAssign(jsId('__m_v'), compileExpression(expression))
-                ]),
-              jsReturn(jsId('__m_v'))]))
-          ]))
-        ]));
+      jsId('nib.runtime.defineProperty'),
+      [
+        jsFunction([], [ jsReturn(compileExpression(expression)) ])
+      ]);
   }
 
   function compileRecordObject(fields) {
@@ -371,18 +362,28 @@
     return compileThrowLiteral("Not Implemented");
   }
 
+  function compileMeta(left, right) {
+    return jsInvoke(
+      jsId('nib.runtime.addMeta'),
+      [
+        left,
+        jsFunction([], [ jsReturn(right) ])
+      ]);
+  }
+
   function compileBinaryOperator(node) {
     // tokenType: plus minus multiply divide
     // Only numbers right now, so there's no need for complex handling of things...
     var left = compileExpression(node.children[0]);
     var right = compileExpression(node.children[1]);
 
-    switch(node.op.value){
-      case "+":  return jsAdd(left, right);
-      case "-":  return jsSub(left, right);
-      case "*":  return jsMul(left, right);
-      case "/":  return jsDiv(left, right);
-      default:   return compileThrowLiteral("Uncompilable operator: " + node.op.value);
+    switch(node.op.type){
+      case tokenType.plus:     return jsAdd(left, right);
+      case tokenType.minus:    return jsSub(left, right);
+      case tokenType.multiply: return jsMul(left, right);
+      case tokenType.divide:   return jsDiv(left, right);
+      case tokenType.meta:     return compileMeta(left, right);
+      default:                 return compileThrowLiteral("Uncompilable operator: " + node.op.value);
     }
   }
 

@@ -3,6 +3,7 @@
   "use strict";
 
   var nodeType = global.nodeType;
+  var tokenType = global.tokenType;
 
   function createDiv(className) {
     var result = document.createElement("div");
@@ -114,12 +115,23 @@
     return element;
   }
 
+  function renderMeta(node) {
+    var metaexp = createDiv("metaExpression");
+    metaexp.appendChild(renderNode("exprBody", node.children[0]));
+    metaexp.appendChild(renderNode("metaRecord", node.children[1]));
+    return metaexp;
+  }
+
   function renderBinaryOperatorExpression(node) {
-    var binopexp = createDiv("binaryExpression");
-    binopexp.appendChild(renderNode("left", node.children[0]));
-    binopexp.appendChild(renderOperator(node.op.value));
-    binopexp.appendChild(renderNode("right", node.children[1]));
-    return binopexp;
+    if (node.op.type === tokenType.meta) {
+      return renderMeta(node);
+    } else {
+      var binopexp = createDiv("binaryExpression");
+      binopexp.appendChild(renderNode("left", node.children[0]));
+      binopexp.appendChild(renderOperator(node.op.value));
+      binopexp.appendChild(renderNode("right", node.children[1]));
+      return binopexp;
+    }
   }
 
   function renderNotImpl(node) {
@@ -141,6 +153,7 @@
     case nodeType.syntaxError: container.appendChild(renderSyntaxError(node)); break;
     default: throw new Error("Missing handler for node type");
     }
+    container._node = node;
     return container;
   }
 

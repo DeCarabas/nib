@@ -379,17 +379,28 @@
          },
          {
            kind: 'codeBlock',
-           label: 'Function One'
+           label: 'Function One',
+           code: { text: 'let x = fn a b c d => a + b + c + d;\n    y = x 1 2;\n    z = { john=5; bob=7; }\n    in y 5' }
          },
          {
            kind: 'textBlock',
            content: 'As you can see, that was a function that returned a function.'
+         },
+         {
+           kind: 'codeBlock',
+           label: 'Function Two',
+           code: { text: '(1 + 2) ^^ { resultStyle=10; }' }
          }
        ]
      };
 
-     var text_one = 'let x = fn a b c d => a + b + c + d;\n    y = x 1 2;\n    z = { john=5; bob=7; }\n    in y 5';
-     setBlockContent(notebook.blocks[1], text_one);
+     notebook.blocks.forEach(function(block) {
+       var type = blockTypes[block.kind];
+       var c = type.getContentText(block);
+       type.setContent(block, c);
+     });
+
+     // setBlockContent(notebook.blocks[1], text_one);
 
      renderNotebook(notebook);
     </script>

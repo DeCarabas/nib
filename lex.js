@@ -4,7 +4,7 @@
   // Lexer
   var tokenType = {
     identifier: 1, numberLiteral: 2,
-    equals: 100, arrow: 101, plus: 102, minus: 103, multiply: 104, divide: 105,
+    equals: 100, arrow: 101, plus: 102, minus: 103, multiply: 104, divide: 105, meta: 106,
     letKeyword: 200, fnKeyword: 201, inKeyword: 202, semicolon: 203, ellipsis: 204,
     openParen: 300, closeParen: 301, openCurly: 302, closeCurly: 303,
     eof: 900, whitespace: 901, error: 999,
@@ -27,6 +27,7 @@
     minus:       { type: tokenType.minus,       value: "-",   length: 1 },
     multiply:    { type: tokenType.multiply,    value: "*",   length: 1 },
     divide:      { type: tokenType.divide,      value: "/",   length: 1 },
+    meta:        { type: tokenType.meta,        value: "^^",  length: 2 },
     letKeyword:  { type: tokenType.letKeyword,  value: "let", length: 3, keyword: true },
     fnKeyword:   { type: tokenType.fnKeyword,   value: "fn",  length: 2, keyword: true },
     inKeyword:   { type: tokenType.inKeyword,   value: "in",  length: 2, keyword: true },
@@ -286,6 +287,19 @@
           token = tokens.arrow;
         } else {
           token = tokens.equals;
+        }
+        break;
+
+      case /*^*/94:
+        if (offset < limit && text.charCodeAt(offset) === /*^*/94) {
+          token = tokens.meta;
+        } else {
+          token = {
+            type: tokenType.error,
+            length: offset - startOffset,
+            value: text.substring(startOffset, offset),
+            error: "Unrecognized symbol. (Did you mean '^^'?)"
+          };
         }
         break;
 
