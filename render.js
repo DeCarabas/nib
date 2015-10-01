@@ -118,6 +118,7 @@
   function renderMeta(node) {
     var metaexp = createDiv("metaExpression");
     metaexp.appendChild(renderNode("exprBody", node.children[0]));
+    metaexp.appendChild(renderOperator("^^"));
     metaexp.appendChild(renderNode("metaRecord", node.children[1]));
     return metaexp;
   }
