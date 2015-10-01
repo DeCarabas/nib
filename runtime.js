@@ -49,6 +49,12 @@
     //
     addMeta: function addMeta(value, metaFunc)
     {
+      if (typeof(value)==="number") {
+        value = new Number(value);
+      } else if (typeof(value)==="boolean") {
+        value = new Boolean(value);
+      }
+
       Object.defineProperty(value, '__meta', global.nib.runtime.defineProperty(metaFunc));
       return value;
     }
