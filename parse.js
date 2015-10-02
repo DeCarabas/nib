@@ -9,25 +9,24 @@
   //
   // A note on error recovery: the token stream object exposes a method
   // called 'resync' which scans ahead to the next instance of a given token,
-  // or returns eof if no such token can be found. The general pattern for
-  // recovering from parse errors, then, is to:
+  // or to eof if no such token can be found, and returns an array of all of
+  // the tokens between the current point and the resync token. The general
+  // pattern for recovering from parse errors, then, is to:
   //
-  //   - Write a loop that runs until it finds a terminator token (e.g.,
-  //     'while(token != tokenType.in)').
+  //   - Put a try/catch around whatever you were parsing.
   //
-  //   - Within the loop, use the .read() method to demand to find a
-  //     particular kind of token. (e.g., tokens.read(tokenType.identifier)).
+  //   - Inside the try/catch, use token_stream.read() to demand a particular
+  //     token type at a particular spot.
   //
-  //   - Put a try/catch around the loop, and catch syntax error
-  //     exceptions. Push the syntax error node into whatever you were
-  //     capturing in the loop, and stop looping.
+  //   - When you catch an exception that has '.syntaxError', use
+  //     token_stream.resync() to advance to the resync token. Assign the
+  //     return value of resync() to the .syntaxError.value member, so that
+  //     the text can be captured in the syntax error.
   //
-  //   - Use tokens.resync() to consume the expected terminator.
+  //   - Replace the node you were supposed to be parsing into with the
+  //     syntax error node.
   //
-  // This works because, on a successful parse, the loop will break on its
-  // own accord, with the current token being the one you would resync to
-  // anyway. On a failed parse, we want to ignore everything until we find
-  // the correct resync point.
+  //   - Use token_stream.read() to consume the resync token.
   //
   var nodeType = {
     apply: 1,identifier: 2,literal: 3, paren: 4,
@@ -56,13 +55,14 @@
   }
 
   function parseError(token_stream, token) {
-    return { type: nodeType.syntaxError, error: token.error, value: [ token ] };
+    return { type: nodeType.syntaxError, error: token.error, errorToken: token, value: [ token ] };
   }
 
   function parseRecord(token_stream, token) {
-    var bindings = [];
+    var bindings = [], resync_start;
     try {
       while (token_stream.peek().type !== tokenType.closeCurly) {
+        resync_start = token_stream.resyncStart();
         var id = token_stream.read(tokenType.identifier);
         var equals = token_stream.read(tokenType.equals);
         var val = parseExpression(token_stream, precedence.record);
@@ -72,36 +72,42 @@
       }
     } catch(e) {
       if (!e.syntaxError) { throw e; }
+      e.syntaxError.value = token_stream.resync(resync_start, tokenType.closeCurly);
       bindings.push(e.syntaxError);
     }
 
-    var close = token_stream.resync(tokenType.closeCurly);
+    var close = token_stream.read(tokenType.closeCurly);
     return { type: nodeType.record, open: token, close: close, children: bindings };
   }
 
   function parseFn(token_stream, token) {
-    var params = [];
+    var params = [], resync_start;
     try {
       while (token_stream.peek().type !== tokenType.arrow) {
+        resync_start = token_stream.resyncStart();
         var id = token_stream.read(tokenType.identifier);
         params.push({ type: nodeType.fnArg, id: id });
       }
     } catch(e) {
       if (!e.syntaxError) { throw e; }
+      e.syntaxError.value = token_stream.resync(resync_start, tokenType.arrow);
       params.push(e.syntaxError);
     }
-    var arrow = token_stream.resync(tokenType.arrow);
+
+    var arrow = token_stream.read(tokenType.arrow);
     var body = parseExpression(token_stream, precedence.fn);
     return { type: nodeType.fn, params: params, arrow: arrow, body: body, children: [ body ] };
   }
 
   function parseLet(token_stream, token) {
     // Token is already let.
-    var bindings = [];
+    var bindings = [], resync_start;
     try {
       do {
         if (token_stream.peek().type === tokenType.semicolon) { token_stream.read(); }
         if (token_stream.peek().type === tokenType.inKeyword) { break; }
+
+        resync_start = token_stream.resyncStart();
 
         var id = token_stream.read(tokenType.identifier);
         var equals = token_stream.read(tokenType.equals);
@@ -111,9 +117,11 @@
       } while(token_stream.peek().type !== tokenType.inKeyword);
     } catch(e) {
       if (!e.syntaxError) { throw e; }
+      e.syntaxError.value = token_stream.resync(resync_start, tokenType.inKeyword);
       bindings.push(e.syntaxError);
     }
-    var in_ = token_stream.resync(tokenType.inKeyword);
+
+    var in_ = token_stream.read(tokenType.inKeyword);
     var expr = parseExpression(token_stream, precedence.let);
 
     var children = bindings.concat(expr);
@@ -124,7 +132,7 @@
     return { type: nodeType.notimpl, token: token };
   }
 
-  function parseParenthetical(token_stream, tokens) {
+  function parseParenthetical(token_stream, token) {
     var expr = parseExpression(token_stream, 0);
     token_stream.read(tokenType.closeParen); // TODO: Resync point here, on close paren?
     return { type: nodeType.paren, children: [ expr ] };
@@ -226,24 +234,25 @@
 
   function parseInfix(token_stream, precedence, left) {
     while (precedence < nextPrecedence(token_stream)) {
+      var resync_start = token_stream.resyncStart();
       var token = token_stream.read();
-      left = infix_table[token.type].parse(token_stream, left, token);
+      left = infix_table[token.type].parse(token_stream, left, token, resync_start);
     }
 
     return left;
   }
 
   function parseExpression(token_stream, precedence) {
+    var resync_start = token_stream.resyncStart();
     var token = token_stream.read();
     try {
-      var left = prefix_table[token.type](token_stream, token);
+      var left = prefix_table[token.type](token_stream, token, resync_start);
 
       return parseInfix(token_stream, precedence, left);
     } catch(e) {
       // Note that in general this will halt parsing; if you want to continue
       // after one of these errors then modify your parse routine to catch
       // syntax errors and resynchronize on some other token.
-      //
       if (!e.syntaxError) { throw e; }
       return e.syntaxError;
     }
@@ -267,24 +276,22 @@
             syntaxError: {
               type: nodeType.syntaxError,
               error: "Parse error: expected " + tokenTypeName(type) + " but got " + token.value,
-              value: [{
-                type: tokenType.syntaxError,
-                offset: token.offset,
-                value: "<<syntax error>>"
-              }]
+              errorToken: token,
+              value: [ token ]
             }
           };
         }
         if (token.type != tokenType.eof) { index++; }
         return token;
       },
-      resync: function resync(type) {
+      resync: function resync(start, type) {
         while(tokens[index].type != type && tokens[index].type != tokenType.eof) {
           index++;
         }
-        var token = tokens[index];
-        if (token.type != tokenType.eof) { index++; }
-        return token;
+        return tokens.slice(start, index);
+      },
+      resyncStart: function resyncStart() {
+        return index;
       },
       peek: function peek() { skipWhitespace(); return tokens[index]; },
     };

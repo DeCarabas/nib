@@ -108,9 +108,17 @@
   }
 
   function renderSyntaxError(node) {
-    var element = createDiv("syntaxError");
+    var element = createDiv("syntaxErrorBlock");
+
+    // Sometimes the error token is not contained in the error text, and so
+    // we need to highlight the whole thing.
+    var errorTokenInRange = node.value.indexOf(node.errorToken) >= 0;
+
     for(var i = 0; i < node.value.length; i++) {
-      element.appendChild(renderTextElement("syntaxErrorToken", node.value[i].value));
+      var tokenClass = ((node.value[i] === node.errorToken) || (!errorTokenInRange))
+        ? "syntaxError"
+        : "syntaxErrorToken";
+      element.appendChild(renderTextElement(tokenClass, node.value[i].value));
     }
     if (node.error) {
       element.title = node.error;
