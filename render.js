@@ -39,7 +39,7 @@
   function renderLetExpression(node) {
     var bindings = createDiv("bindings");
     for(var i = 0; i < node.bindings.length; i++) {
-      bindings.appendChild(renderBinding(node.bindings[i]));
+      renderNodeInto(bindings,node.bindings[i]);
     }
 
     var expr = createDiv("expr");
@@ -82,7 +82,7 @@
   function renderRecord(node) {
     var record = createDiv("recordExpression");
     for(var i = 0; i < node.children.length; i++) {
-      record.appendChild(renderRecordField(node.children[i]));
+      renderNodeInto(record, node.children[i]);
     }
     return record;
   }
@@ -108,9 +108,12 @@
   }
 
   function renderSyntaxError(node) {
-    var element = renderTextElement("syntaxError", node.value.value);
-    if (node.value.error) {
-      element.title = node.value.error;
+    var element = createDiv("syntaxError");
+    for(var i = 0; i < node.value.length; i++) {
+      element.appendChild(renderTextElement("syntaxErrorToken", node.value[i].value));
+    }
+    if (node.error) {
+      element.title = node.error;
     }
     return element;
   }
@@ -141,21 +144,27 @@
 
   function renderNode(name, node) {
     var container = createDiv(name);
+    renderNodeInto(container, node);
+    return container;
+  }
+
+  function renderNodeInto(container, node) {
     switch(node.type) {
     case nodeType.let: container.appendChild(renderLetExpression(node)); break;
     case nodeType.fn: container.appendChild(renderFnExpression(node)); break;
     case nodeType.apply: container.appendChild(renderApplyExpression(node)); break;
     case nodeType.identifier: container.appendChild(renderIdentifierExpression(node)); break;
+    case nodeType.letBinding: container.appendChild(renderBinding(node)); break;
     case nodeType.literal: container.appendChild(renderLiteralExpression(node)); break;
     case nodeType.binaryOperator: container.appendChild(renderBinaryOperatorExpression(node)); break;
     case nodeType.notimpl: container.appendChild(renderNotImpl(node)); break;
     case nodeType.paren: container.appendChild(renderParenthetical(node)); break;
     case nodeType.record: container.appendChild(renderRecord(node)); break;
+    case nodeType.recordField: container.appendChild(renderRecordField(node)); break;
     case nodeType.syntaxError: container.appendChild(renderSyntaxError(node)); break;
     default: throw new Error("Missing handler for node type");
     }
     container._node = node;
-    return container;
   }
 
   global.renderNode = renderNode;

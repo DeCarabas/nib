@@ -245,7 +245,11 @@
       [
         jsDot(jsId('Object'), jsId('prototype')),
         jsObject(fields.map(function convertField(f) {
-          return jsField(f.name.value, compileEvalOnceProperty(f.expr));
+          if (f.expr) {
+            return jsField(f.name.value, compileEvalOnceProperty(f.expr));
+          } else {
+            return compileSyntaxError(f);
+          }
         }))
       ]);
   }

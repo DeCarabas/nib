@@ -45,7 +45,9 @@
     var newTable = createSymbolTable(table, node);
     for (var i = 0; i < node.params.length; i++) {
       var p = node.params[i];
-      newTable.addBinding(p.id.value, p);
+      if (p.id) {
+        newTable.addBinding(p.id.value, p);
+      }
     }
     node.scope = newTable;
     return newTable;
@@ -55,7 +57,9 @@
     var newTable = createSymbolTable(table, node);
     for (var i = 0; i < node.bindings.length; i++) {
       var b = node.bindings[i];
-      newTable.addBinding(b.decl.value, b);
+      if (b.decl) {
+        newTable.addBinding(b.decl.value, b);
+      }
     }
     node.scope = newTable;
     return newTable;
@@ -65,7 +69,9 @@
     var newTable = createSymbolTable(table, node);
     for (var i = 0; i < node.children.length; i++) {
       var c = node.children[i];
-      newTable.addBinding(c.decl.value, c);
+      if (c.decl) {
+        newTable.addBinding(c.decl.value, c);
+      }
     }
     node.scope = newTable;
     return newTable;
