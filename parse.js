@@ -7,26 +7,29 @@
   // Parser. This is a 'Pratt Parser', inspired by
   // http://journal.stuffwithstuff.com/2011/03/19/pratt-parsers-expression-parsing-made-easy/
   //
-  // A note on error recovery: the token stream object exposes a method
-  // called 'resync' which scans ahead to the next instance of a given token,
-  // or to eof if no such token can be found, and returns an array of all of
-  // the tokens between the current point and the resync token. The general
-  // pattern for recovering from parse errors, then, is to:
+  // A note on error recovery: if you want to recover from parse errors, use
+  // the following pattern:
   //
-  //   - Put a try/catch around whatever you were parsing.
+  //        try {
+  // [1]      token_stream.pushResync(resync_token_type);
+  //          << parsing logic >>
+  // [2]      token_stream.popResync();
+  // [3]      return parsed node;
+  //       } catch(e) {
+  // [4]      if (!e.syntaxError) { throw e; }
+  // [5]      if (token_stream.peek().type !== resync_token_type) { throw e; }
+  // [6]      return e.syntaxError;
+  //       }
   //
-  //   - Inside the try/catch, use token_stream.read() to demand a particular
-  //     token type at a particular spot.
-  //
-  //   - When you catch an exception that has '.syntaxError', use
-  //     token_stream.resync() to advance to the resync token. Assign the
-  //     return value of resync() to the .syntaxError.value member, so that
-  //     the text can be captured in the syntax error.
-  //
-  //   - Replace the node you were supposed to be parsing into with the
-  //     syntax error node.
-  //
-  //   - Use token_stream.read() to consume the resync token.
+  // On line [1], we tell the token stream where we want to resynchronize if
+  // something goes wrong. Then we proceed with the normal parsing; if
+  // everything goes well, then on line [2] we tell the token stream to
+  // forget about our resync point and on line [3] we construct our finished
+  // node and move on. If something goes wrong, then on line [4] we make sure
+  // to ignore non-syntax-error-exceptions, and on line [5] we ignore syntax
+  // errors that resynchronized to somewhere that isn't us (i.e., somewhere
+  // above us in the stack), Finally, on line [6], we treat the syntax error
+  // node as the result of our parse.
   //
   var nodeType = {
     apply: 1,identifier: 2,literal: 3, paren: 4,
@@ -59,10 +62,10 @@
   }
 
   function parseRecord(token_stream, token) {
-    var bindings = [], resync_start;
+    var bindings = [];
     try {
+      token_stream.pushResync(tokenType.closeCurly);
       while (token_stream.peek().type !== tokenType.closeCurly) {
-        resync_start = token_stream.resyncStart();
         var id = token_stream.read(tokenType.identifier);
         var equals = token_stream.read(tokenType.equals);
         var val = parseExpression(token_stream, precedence.record);
@@ -70,9 +73,10 @@
 
         bindings.push({type: nodeType.recordField, decl: id, expr: val, equals: equals, children: [ val ] });
       }
+      token_stream.popResync();
     } catch(e) {
       if (!e.syntaxError) { throw e; }
-      e.syntaxError.value = token_stream.resync(resync_start, tokenType.closeCurly);
+      if (token_stream.peek().type !== tokenType.closeCurly) { throw e; }
       bindings.push(e.syntaxError);
     }
 
@@ -81,16 +85,17 @@
   }
 
   function parseFn(token_stream, token) {
-    var params = [], resync_start;
+    var params = [];
     try {
+      token_stream.pushResync(tokenType.arrow);
       while (token_stream.peek().type !== tokenType.arrow) {
-        resync_start = token_stream.resyncStart();
         var id = token_stream.read(tokenType.identifier);
         params.push({ type: nodeType.fnArg, id: id });
       }
+      token_stream.popResync();
     } catch(e) {
       if (!e.syntaxError) { throw e; }
-      e.syntaxError.value = token_stream.resync(resync_start, tokenType.arrow);
+      if (token_stream.peek().type !== tokenType.arrow) { throw e; }
       params.push(e.syntaxError);
     }
 
@@ -101,23 +106,24 @@
 
   function parseLet(token_stream, token) {
     // Token is already let.
-    var bindings = [], resync_start;
+    var bindings = [];
     try {
       do {
         if (token_stream.peek().type === tokenType.semicolon) { token_stream.read(); }
         if (token_stream.peek().type === tokenType.inKeyword) { break; }
 
-        resync_start = token_stream.resyncStart();
+        token_stream.pushResync(tokenType.inKeyword);
 
         var id = token_stream.read(tokenType.identifier);
         var equals = token_stream.read(tokenType.equals);
         var val = parseExpression(token_stream, precedence.let);
 
         bindings.push({ type: nodeType.letBinding, decl: id, expr: val, equals: equals, children: [ val ] });
+        token_stream.popResync();
       } while(token_stream.peek().type !== tokenType.inKeyword);
     } catch(e) {
       if (!e.syntaxError) { throw e; }
-      e.syntaxError.value = token_stream.resync(resync_start, tokenType.inKeyword);
+      if (token_stream.peek().type !== tokenType.inKeyword) { throw e; }
       bindings.push(e.syntaxError);
     }
 
@@ -234,32 +240,26 @@
 
   function parseInfix(token_stream, precedence, left) {
     while (precedence < nextPrecedence(token_stream)) {
-      var resync_start = token_stream.resyncStart();
       var token = token_stream.read();
-      left = infix_table[token.type].parse(token_stream, left, token, resync_start);
+      left = infix_table[token.type].parse(token_stream, left, token);
     }
 
     return left;
   }
 
   function parseExpression(token_stream, precedence) {
-    var resync_start = token_stream.resyncStart();
     var token = token_stream.read();
-    try {
-      var left = prefix_table[token.type](token_stream, token, resync_start);
+    var left = prefix_table[token.type](token_stream, token);
 
-      return parseInfix(token_stream, precedence, left);
-    } catch(e) {
-      // Note that in general this will halt parsing; if you want to continue
-      // after one of these errors then modify your parse routine to catch
-      // syntax errors and resynchronize on some other token.
-      if (!e.syntaxError) { throw e; }
-      return e.syntaxError;
-    }
+    return parseInfix(token_stream, precedence, left);
   }
 
   function parse(tokens) {
     var index = 0;
+
+    // Initial resync state is to look for EOF, starting at the first token.
+    var resyncTokens = [tokenType.eof];
+    var resyncPositions = [0];
 
     function skipWhitespace() {
       while(tokens[index].type === tokenType.whitespace) {
@@ -267,36 +267,62 @@
       }
     }
 
+    function throwSyntaxError(message, token) {
+      // Resync by advancing to the first token that is anywhere in our
+      // resync stack...
+      do {
+        if (resyncTokens.indexOf(tokens[index].type) >= 0) { break; }
+        index++;
+      } while(index < tokens.length);
+
+      // Pop the resync stack down to the matching resync token, and record
+      // the starting token position of the resync point.
+      while(resyncTokens.pop() !== tokens[index].type) { resyncPositions.pop(); }
+      var resyncPosition = resyncPositions.pop();
+
+      // Gather the tokens that are part of the error.
+      var errorTokens = tokens.slice(resyncPosition, index);
+
+      // And throw the exception!
+      throw {
+        syntaxError: {
+          type: nodeType.syntaxError,
+          error: message,
+          errorToken: token,
+          value: errorTokens
+        }
+      };
+    }
+
     var token_stream = {
       read: function read(type) {
         skipWhitespace();
         var token = tokens[index];
         if (type && token.type !== type) {
-          throw {
-            syntaxError: {
-              type: nodeType.syntaxError,
-              error: "Parse error: expected " + tokenTypeName(type) + " but got " + token.value,
-              errorToken: token,
-              value: [ token ]
-            }
-          };
+          throwSyntaxError(
+            "Parse error: expected " + tokenTypeName(type) + " but got " + token.value,
+            token);
         }
         if (token.type != tokenType.eof) { index++; }
         return token;
       },
-      resync: function resync(start, type) {
-        while(tokens[index].type != type && tokens[index].type != tokenType.eof) {
-          index++;
-        }
-        return tokens.slice(start, index);
+      pushResync: function pushResync(tokenType) {
+        resyncTokens.push(tokenType);
+        resyncPositions.push(index);
       },
-      resyncStart: function resyncStart() {
-        return index;
+      popResync: function popResync() {
+        resyncTokens.pop();
+        resyncPositions.pop();
       },
       peek: function peek() { skipWhitespace(); return tokens[index]; },
     };
 
-    return parseExpression(token_stream, 0);
+    try {
+      return parseExpression(token_stream, 0);
+    } catch(e) {
+      if (!e.syntaxError) { throw e; }
+      return e.syntaxError;
+    }
   }
 
   function nodeName(node) {
