@@ -7,29 +7,25 @@
   // Parser. This is a 'Pratt Parser', inspired by
   // http://journal.stuffwithstuff.com/2011/03/19/pratt-parsers-expression-parsing-made-easy/
   //
-  // A note on error recovery: if you want to recover from parse errors, use
-  // the following pattern:
+  // A note on error recovery: for error recovery, use the parseWithResync
+  // function exposed by the token stream:
   //
-  //        try {
-  // [1]      token_stream.pushResync(resync_token_type);
-  //          << parsing logic >>
-  // [2]      token_stream.popResync();
-  // [3]      return parsed node;
-  //       } catch(e) {
-  // [4]      if (!e.syntaxError) { throw e; }
-  // [5]      if (token_stream.peek().type !== resync_token_type) { throw e; }
-  // [6]      return e.syntaxError;
-  //       }
+  //    var result = token_stream.parseWithResync(<< resync token type >>, function() {
+  //      << parsing logic here >>
+  //      return << parsed node >>;
+  //    });
+  //    << consume resync token here >>
   //
-  // On line [1], we tell the token stream where we want to resynchronize if
-  // something goes wrong. Then we proceed with the normal parsing; if
-  // everything goes well, then on line [2] we tell the token stream to
-  // forget about our resync point and on line [3] we construct our finished
-  // node and move on. If something goes wrong, then on line [4] we make sure
-  // to ignore non-syntax-error-exceptions, and on line [5] we ignore syntax
-  // errors that resynchronized to somewhere that isn't us (i.e., somewhere
-  // above us in the stack), Finally, on line [6], we treat the syntax error
-  // node as the result of our parse.
+  // What this will do is resynchronize the token stream on the next token of
+  // the specified type if a parse error occurs. parseWithResync will either
+  // return the result of the parsing function, if successful, or a syntax
+  // error node, if an error occurred. Either way, your code should expect
+  // the current token in the token stream to be the resync token after
+  // parseWithResync returns.
+  //
+  // Note that, if the token stream was unable to resynchronize on your
+  // resync token, then it will let the syntax error exception escape, and
+  // hope that some other, higher-level parseWithResync function catches it.
   //
   var nodeType = {
     apply: 1,identifier: 2,literal: 3, paren: 4,
@@ -91,10 +87,12 @@
   function parseFn(token_stream, token) {
     var params = [];
     while (token_stream.peek().type !== tokenType.arrow) {
-      var p = token_stream.parseWithResync(tokenType.arrow, function parseFnArg() {
-        var id = token_stream.read(tokenType.identifier);
-        return { type: nodeType.fnArg, id: id };
-      });
+      var p = token_stream.parseWithResync(
+        tokenType.arrow,
+        function parseFnArg() {
+          var id = token_stream.read(tokenType.identifier);
+          return { type: nodeType.fnArg, id: id };
+        });
       params.push(p);
     }
 
@@ -104,13 +102,15 @@
   }
 
   function parseLetBinding(token_stream) {
-    var binding = token_stream.parseWithResync(tokenType.semicolon, function() {
+    var binding = token_stream.parseWithResync(
+      tokenType.semicolon,
+      function() {
         var id = token_stream.read(tokenType.identifier);
         var equals = token_stream.read(tokenType.equals);
         var val = parseExpression(token_stream, precedence.let);
 
         return { type: nodeType.letBinding, decl: id, expr: val, equals: equals, children: [ val ] };
-    });
+      });
 
     if (token_stream.peek().type !== tokenType.inKeyword) {
       token_stream.read(tokenType.semicolon);
@@ -123,9 +123,11 @@
     // Token is already let.
     var bindings = [];
     while(token_stream.peek().type !== tokenType.inKeyword) {
-      var binding = token_stream.parseWithResync(tokenType.inKeyword, function() {
-        return parseLetBinding(token_stream);
-      });
+      var binding = token_stream.parseWithResync(
+        tokenType.inKeyword,
+        function() {
+          return parseLetBinding(token_stream);
+        });
       bindings.push(binding);
     }
 
@@ -316,8 +318,6 @@
         resyncTokens.pop();
         resyncPositions.pop();
       },
-      peek: function peek() { skipWhitespace(); return tokens[index]; },
-
       parseWithResync: function parseWithResync(resyncTokenType, parseFunction) {
         try {
           this.pushResync(resyncTokenType);
@@ -326,10 +326,11 @@
           return result;
         } catch (e) {
           if (!e.syntaxError) { throw e; }
-          if (this.peek().type != resyncTokenType) { throw e; }
+          if (this.peek().type !== resyncTokenType) { throw e; }
           return e.syntaxError;
         }
-      }
+      },
+      peek: function peek() { skipWhitespace(); return tokens[index]; }
     };
 
     try {
