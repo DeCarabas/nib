@@ -61,23 +61,27 @@
     return { type: nodeType.syntaxError, error: token.error, errorToken: token, value: [ token ] };
   }
 
-  function parseRecord(token_stream, token) {
-    var bindings = [];
-    try {
-      token_stream.pushResync(tokenType.closeCurly);
-      while (token_stream.peek().type !== tokenType.closeCurly) {
+  function parseRecordField(token_stream) {
+    var binding = token_stream.parseWithResync(
+      tokenType.semicolon,
+      function parseRecordFieldInternal() {
         var id = token_stream.read(tokenType.identifier);
         var equals = token_stream.read(tokenType.equals);
         var val = parseExpression(token_stream, precedence.record);
-        token_stream.read(tokenType.semicolon);
 
-        bindings.push({type: nodeType.recordField, decl: id, expr: val, equals: equals, children: [ val ] });
-      }
-      token_stream.popResync();
-    } catch(e) {
-      if (!e.syntaxError) { throw e; }
-      if (token_stream.peek().type !== tokenType.closeCurly) { throw e; }
-      bindings.push(e.syntaxError);
+        return { type: nodeType.recordField, decl: id, expr: val, equals: equals, children: [ val ] };
+      });
+    token_stream.read(tokenType.semicolon);
+    return binding;
+  }
+
+  function parseRecord(token_stream, token) {
+    var bindings = [];
+    while (token_stream.peek().type !== tokenType.closeCurly) {
+      var binding = token_stream.parseWithResync(
+        tokenType.closeCurly,
+        function doParseRecordField() { return parseRecordField(token_stream); });
+      bindings.push(binding);
     }
 
     var close = token_stream.read(tokenType.closeCurly);
@@ -86,17 +90,12 @@
 
   function parseFn(token_stream, token) {
     var params = [];
-    try {
-      token_stream.pushResync(tokenType.arrow);
-      while (token_stream.peek().type !== tokenType.arrow) {
+    while (token_stream.peek().type !== tokenType.arrow) {
+      var p = token_stream.parseWithResync(tokenType.arrow, function parseFnArg() {
         var id = token_stream.read(tokenType.identifier);
-        params.push({ type: nodeType.fnArg, id: id });
-      }
-      token_stream.popResync();
-    } catch(e) {
-      if (!e.syntaxError) { throw e; }
-      if (token_stream.peek().type !== tokenType.arrow) { throw e; }
-      params.push(e.syntaxError);
+        return { type: nodeType.fnArg, id: id };
+      });
+      params.push(p);
     }
 
     var arrow = token_stream.read(tokenType.arrow);
@@ -104,27 +103,30 @@
     return { type: nodeType.fn, params: params, arrow: arrow, body: body, children: [ body ] };
   }
 
-  function parseLet(token_stream, token) {
-    // Token is already let.
-    var bindings = [];
-    try {
-      do {
-        if (token_stream.peek().type === tokenType.semicolon) { token_stream.read(); }
-        if (token_stream.peek().type === tokenType.inKeyword) { break; }
-
-        token_stream.pushResync(tokenType.inKeyword);
-
+  function parseLetBinding(token_stream) {
+    var binding = token_stream.parseWithResync(tokenType.semicolon, function() {
         var id = token_stream.read(tokenType.identifier);
         var equals = token_stream.read(tokenType.equals);
         var val = parseExpression(token_stream, precedence.let);
 
-        bindings.push({ type: nodeType.letBinding, decl: id, expr: val, equals: equals, children: [ val ] });
-        token_stream.popResync();
-      } while(token_stream.peek().type !== tokenType.inKeyword);
-    } catch(e) {
-      if (!e.syntaxError) { throw e; }
-      if (token_stream.peek().type !== tokenType.inKeyword) { throw e; }
-      bindings.push(e.syntaxError);
+        return { type: nodeType.letBinding, decl: id, expr: val, equals: equals, children: [ val ] };
+    });
+
+    if (token_stream.peek().type !== tokenType.inKeyword) {
+      token_stream.read(tokenType.semicolon);
+    }
+
+    return binding;
+  }
+
+  function parseLet(token_stream, token) {
+    // Token is already let.
+    var bindings = [];
+    while(token_stream.peek().type !== tokenType.inKeyword) {
+      var binding = token_stream.parseWithResync(tokenType.inKeyword, function() {
+        return parseLetBinding(token_stream);
+      });
+      bindings.push(binding);
     }
 
     var in_ = token_stream.read(tokenType.inKeyword);
@@ -140,7 +142,7 @@
 
   function parseParenthetical(token_stream, token) {
     var expr = parseExpression(token_stream, 0);
-    token_stream.read(tokenType.closeParen); // TODO: Resync point here, on close paren?
+    token_stream.read(tokenType.closeParen); // TODO: Resync point here, on close paren? (yes)
     return { type: nodeType.paren, children: [ expr ] };
   }
 
@@ -315,6 +317,19 @@
         resyncPositions.pop();
       },
       peek: function peek() { skipWhitespace(); return tokens[index]; },
+
+      parseWithResync: function parseWithResync(resyncTokenType, parseFunction) {
+        try {
+          this.pushResync(resyncTokenType);
+          var result = parseFunction(this);
+          this.popResync();
+          return result;
+        } catch (e) {
+          if (!e.syntaxError) { throw e; }
+          if (this.peek().type != resyncTokenType) { throw e; }
+          return e.syntaxError;
+        }
+      }
     };
 
     try {
