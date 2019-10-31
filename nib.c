@@ -5,6 +5,8 @@
 #include <termios.h>
 #include <unistd.h>
 
+#define CTRL_KEY(k) ((k)&0x1f)
+
 static void die(const char *message) {
   perror(message);
   exit(1);
@@ -45,8 +47,6 @@ static void buffer_append_z(struct Buffer *buffer, const char *data) {
   buffer_append(buffer, data, strlen(data));
 }
 
-#define ANSI_ESC "\x1B["
-
 struct termios original_mode;
 
 static void screen_restore_mode(void) {
@@ -74,12 +74,22 @@ static void screen_raw_mode(void) {
   atexit(screen_restore_mode);
 }
 
-static void screen_clear(void) { printf(ANSI_ESC "1;1H" ANSI_ESC "0J"); }
+static void screen_clear(void) { write(STDOUT_FILENO, "\x1b[2J\x1b[H", 7); }
 
 static void screen_draw(struct Buffer *buffer) {
   screen_clear();
-  printf("%.*s", buffer->length, buffer->memory);
-  fflush(stdout);
+  write(STDOUT_FILENO, buffer->memory, buffer->length);
+}
+
+static char key_read(void) {
+  int nread;
+  char c;
+  while ((nread = read(STDIN_FILENO, &c, 1)) != 1) {
+    if (nread == -1 && errno != EAGAIN) {
+      die("read");
+    }
+  }
+  return c;
 }
 
 int main() {
@@ -90,12 +100,7 @@ int main() {
   screen_raw_mode();
   for (;;) {
     screen_draw(&buffer);
-
-    char c = 0;
-    if (read(STDIN_FILENO, &c, 1) == -1 && errno != EAGAIN) {
-      die("read");
-    }
-
+    char c = key_read();
     if (c == 'q') {
       break;
     }
