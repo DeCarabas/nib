@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/ioctl.h>
 #include <termios.h>
 #include <unistd.h>
 
@@ -48,11 +49,25 @@ struct Terminal {
   struct Buffer buffer;
   int input_fileno;
   int output_fileno;
+  int rows;
+  int columns;
 };
 
 static struct Terminal *global_terminal = NULL;
 
 static void term_atexit(void);
+
+static int term_get_size(int fileno, int *rows, int *cols) {
+  struct winsize ws;
+  if (ioctl(fileno, TIOCGWINSZ, &ws) == -1 || ws.ws_col == 0) {
+    // TODO: Complex escape codes to get the actual size. :P
+    return -1;
+  } else {
+    *cols = ws.ws_col;
+    *rows = ws.ws_row;
+    return 0;
+  }
+}
 
 static void term_init(struct Terminal *terminal, int input_fileno,
                       int output_fileno) {
@@ -77,12 +92,17 @@ static void term_init(struct Terminal *terminal, int input_fileno,
   if (tcsetattr(input_fileno, TCSAFLUSH, &raw) == -1) {
     die("tcsetattr setting raw");
   }
+
+  if (term_get_size(input_fileno, &terminal->rows, &terminal->columns)) {
+    die("term_get_size");
+  }
+
   atexit(term_atexit);
 }
 
 static void term_free(struct Terminal *terminal) {
-  struct termios *original = &(global_terminal->original_mode);
-  if (tcsetattr(global_terminal->input_fileno, TCSAFLUSH, original) == -1) {
+  struct termios *original = &(terminal->original_mode);
+  if (tcsetattr(terminal->input_fileno, TCSAFLUSH, original) == -1) {
     die("tcsetattr");
   }
   buffer_free(&terminal->buffer);
@@ -131,9 +151,11 @@ static void term_write(struct Terminal *terminal, const char *data,
 
 static void editor_render(struct Terminal *terminal) {
   term_clear(terminal);
-  for (int i = 0; i < 5; i++) {
+  for (int i = 0; i < terminal->rows - 1; i++) {
     term_write(terminal, "~\r\n", 3);
   }
+  const char *message = "Hello world, I am ready for you.";
+  term_write(terminal, message, strlen(message));
   term_set_cursor(terminal);
 }
 
