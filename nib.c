@@ -5,8 +5,6 @@
 #include <termios.h>
 #include <unistd.h>
 
-#define CTRL_KEY(k) ((k)&0x1f)
-
 static void die(const char *message) {
   perror(message);
   exit(1);
@@ -43,23 +41,31 @@ static void buffer_append(struct Buffer *buffer, const char *data, int length) {
   buffer->length += length;
 }
 
-static void buffer_append_z(struct Buffer *buffer, const char *data) {
-  buffer_append(buffer, data, strlen(data));
-}
+static void buffer_clear(struct Buffer *buffer) { buffer->length = 0; }
 
-struct termios original_mode;
+struct Terminal {
+  struct termios original_mode;
+  struct Buffer buffer;
+  int input_fileno;
+  int output_fileno;
+};
 
-static void screen_restore_mode(void) {
-  if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &original_mode) == -1) {
-    die("tcsetattr");
-  }
-}
+static struct Terminal *global_terminal = NULL;
 
-static void screen_raw_mode(void) {
-  if (tcgetattr(STDIN_FILENO, &original_mode) == -1) {
+static void term_atexit(void);
+
+static void term_init(struct Terminal *terminal, int input_fileno,
+                      int output_fileno) {
+  global_terminal = terminal;
+  terminal->input_fileno = input_fileno;
+  terminal->output_fileno = output_fileno;
+  bufffer_init(&terminal->buffer);
+
+  // Setup raw mode for the terminal.
+  if (tcgetattr(input_fileno, &terminal->original_mode) == -1) {
     die("tcgetattr setting raw");
   }
-  struct termios raw = original_mode;
+  struct termios raw = terminal->original_mode;
   raw.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
   raw.c_oflag &= ~(OPOST);
   raw.c_cflag |= (CS8);
@@ -68,23 +74,31 @@ static void screen_raw_mode(void) {
   raw.c_cc[VMIN] = 0;  // Minimum characters before returning.
   raw.c_cc[VTIME] = 1; // Timeout in 100ms increments.
 
-  if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw) == -1) {
+  if (tcsetattr(input_fileno, TCSAFLUSH, &raw) == -1) {
     die("tcsetattr setting raw");
   }
-  atexit(screen_restore_mode);
+  atexit(term_atexit);
 }
 
-static void screen_clear(void) { write(STDOUT_FILENO, "\x1b[2J\x1b[H", 7); }
-
-static void screen_draw(struct Buffer *buffer) {
-  screen_clear();
-  write(STDOUT_FILENO, buffer->memory, buffer->length);
+static void term_free(struct Terminal *terminal) {
+  struct termios *original = &(global_terminal->original_mode);
+  if (tcsetattr(global_terminal->input_fileno, TCSAFLUSH, original) == -1) {
+    die("tcsetattr");
+  }
+  buffer_free(&terminal->buffer);
+  global_terminal = NULL;
 }
 
-static char key_read(void) {
+static void term_atexit(void) {
+  if (global_terminal) {
+    term_free(global_terminal);
+  }
+}
+
+static char term_read(struct Terminal *terminal) {
   int nread;
   char c;
-  while ((nread = read(STDIN_FILENO, &c, 1)) != 1) {
+  while ((nread = read(terminal->input_fileno, &c, 1)) != 1) {
     if (nread == -1 && errno != EAGAIN) {
       die("read");
     }
@@ -92,20 +106,50 @@ static char key_read(void) {
   return c;
 }
 
-int main() {
-  struct Buffer buffer;
-  bufffer_init(&buffer);
-  buffer_append_z(&buffer, "Hello World!");
+static void term_set_cursor(struct Terminal *terminal) {
+  buffer_append(&terminal->buffer, "\x1b[H", 3); // Cursor to upper-left
+}
 
-  screen_raw_mode();
+static void term_clear(struct Terminal *terminal) {
+  struct Buffer *buffer = &terminal->buffer;
+  buffer_clear(buffer);
+  buffer_append(buffer, "\x1b[?25l", 6); // Hide cursor
+  buffer_append(buffer, "\x1b[2J", 4);   // Clear screen
+  buffer_append(buffer, "\x1b[H", 3);    // Cursor to upper-left
+}
+
+static void term_draw(struct Terminal *terminal) {
+  struct Buffer *buffer = &terminal->buffer;
+  buffer_append(buffer, "\x1b[?25h", 6); // Show cursor
+  write(terminal->output_fileno, buffer->memory, buffer->length);
+}
+
+static void term_write(struct Terminal *terminal, const char *data,
+                       int length) {
+  buffer_append(&terminal->buffer, data, length);
+}
+
+static void editor_render(struct Terminal *terminal) {
+  term_clear(terminal);
+  for (int i = 0; i < 5; i++) {
+    term_write(terminal, "~\r\n", 3);
+  }
+  term_set_cursor(terminal);
+}
+
+int main() {
+  struct Terminal terminal;
+  term_init(&terminal, STDIN_FILENO, STDOUT_FILENO);
+
   for (;;) {
-    screen_draw(&buffer);
-    char c = key_read();
+    editor_render(&terminal);
+    term_draw(&terminal);
+    char c = term_read(&terminal);
     if (c == 'q') {
       break;
     }
   }
 
-  buffer_free(&buffer);
+  term_free(&terminal);
   return 0;
 }
