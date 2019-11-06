@@ -1,3 +1,4 @@
+#include <ctype.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -10,6 +11,8 @@ static void die(const char *message) {
   perror(message);
   exit(1);
 }
+
+#define UNUSED(x) (void)(x)
 
 struct Buffer {
   char *memory;
@@ -149,29 +152,100 @@ static void term_write(struct Terminal *terminal, const char *data,
   buffer_append(&terminal->buffer, data, length);
 }
 
-static void editor_render(struct Terminal *terminal) {
+#define CONTROL(c) (c - 'a' + 1)
+
+struct Editor;
+typedef void (*KEY_FN)(struct Editor *, char);
+
+struct Editor {
+  KEY_FN keymap[256];
+  struct Buffer buffer;
+};
+
+static void editor_quit(struct Editor *e, char c) {
+  UNUSED(e);
+  UNUSED(c);
+  exit(0);
+}
+
+static void editor_insert_self(struct Editor *e, char c) {
+  buffer_append(&e->buffer, &c, 1);
+}
+
+static void editor_insert_line(struct Editor *e, char c) {
+  c = '\n';
+  buffer_append(&e->buffer, &c, 1);
+}
+
+static void editor_init_keymap(KEY_FN keymap[256]) {
+  memset(keymap, 0, sizeof(KEY_FN) * 256);
+  for (char c = 1; c < 127; c++) {
+    if (!iscntrl(c)) {
+      keymap[(int)c] = editor_insert_self;
+    }
+  }
+  keymap[CONTROL('q')] = editor_quit;
+  keymap[CONTROL('m')] = editor_insert_line;
+}
+
+static void editor_init(struct Editor *editor) {
+  editor_init_keymap(editor->keymap);
+  bufffer_init(&editor->buffer);
+}
+
+static void editor_free(struct Editor *editor) { buffer_free(&editor->buffer); }
+
+static void editor_render(struct Editor *editor, struct Terminal *terminal) {
   term_clear(terminal);
-  for (int i = 0; i < terminal->rows - 1; i++) {
+
+  int row = 0;
+  char *src = editor->buffer.memory;
+  for (int i = 0; i < editor->buffer.length; i++) {
+    if (src[i] == '\n') {
+      term_write(terminal, "\r\n", 2);
+      row += 1;
+      if (row >= terminal->rows - 1) {
+        break;
+      }
+    } else {
+      term_write(terminal, src + i, 1);
+    }
+  }
+  term_write(terminal, "\r\n", 2);
+  row += 1;
+  for (; row < terminal->rows - 1; row++) {
     term_write(terminal, "~\r\n", 3);
   }
+
+  // Status line.
   const char *message = "Hello world, I am ready for you.";
   term_write(terminal, message, strlen(message));
   term_set_cursor(terminal);
+}
+
+static void editor_handle_key(struct Editor *editor, char c) {
+  KEY_FN fn = editor->keymap[(int)c];
+  if (fn) {
+    fn(editor, c);
+  }
 }
 
 int main() {
   struct Terminal terminal;
   term_init(&terminal, STDIN_FILENO, STDOUT_FILENO);
 
+  struct Editor editor;
+  editor_init(&editor);
+
   for (;;) {
-    editor_render(&terminal);
+    editor_render(&editor, &terminal);
     term_draw(&terminal);
+
     char c = term_read(&terminal);
-    if (c == 'q') {
-      break;
-    }
+    editor_handle_key(&editor, c);
   }
 
+  editor_free(&editor);
   term_free(&terminal);
   return 0;
 }
