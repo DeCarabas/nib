@@ -45,6 +45,32 @@ static void buffer_append(struct Buffer *buffer, const char *data, int length) {
   buffer->length += length;
 }
 
+static void buffer_append_int(struct Buffer *buffer, int value) {
+  char txt[21]; // -9,223,372,036,854,775,807
+
+  char *end = txt + 21;
+  char *cursor = end;
+
+  int neg = 0;
+  if (value < 0) {
+    neg = 1;
+    value = -value;
+  }
+
+  while (value) {
+    cursor -= 1;
+    *cursor = (value % 10) + '0';
+    value /= 10;
+  }
+
+  if (neg) {
+    cursor -= 1;
+    *cursor = '-';
+  }
+
+  buffer_append(buffer, cursor, end - cursor);
+}
+
 static void buffer_clear(struct Buffer *buffer) { buffer->length = 0; }
 
 struct Terminal {
@@ -129,8 +155,12 @@ static char term_read(struct Terminal *terminal) {
   return c;
 }
 
-static void term_set_cursor(struct Terminal *terminal) {
-  buffer_append(&terminal->buffer, "\x1b[H", 3); // Cursor to upper-left
+static void term_set_cursor(struct Terminal *terminal, int row, int col) {
+  buffer_append(&terminal->buffer, "\x1b[", 2);
+  buffer_append_int(&terminal->buffer, row + 1);
+  buffer_append(&terminal->buffer, ";", 1);
+  buffer_append_int(&terminal->buffer, col + 1);
+  buffer_append(&terminal->buffer, "H", 1);
 }
 
 static void term_clear(struct Terminal *terminal) {
@@ -158,8 +188,11 @@ struct Editor;
 typedef void (*KEY_FN)(struct Editor *, char);
 
 struct Editor {
-  KEY_FN keymap[256];
+  KEY_FN default_keymap[256];
+  KEY_FN *current_keymap;
   struct Buffer buffer;
+  int row;
+  int column;
 };
 
 static void editor_quit(struct Editor *e, char c) {
@@ -170,11 +203,14 @@ static void editor_quit(struct Editor *e, char c) {
 
 static void editor_insert_self(struct Editor *e, char c) {
   buffer_append(&e->buffer, &c, 1);
+  e->column += 1;
 }
 
 static void editor_insert_line(struct Editor *e, char c) {
   c = '\n';
   buffer_append(&e->buffer, &c, 1);
+  e->column = 0;
+  e->row += 1;
 }
 
 static void editor_init_keymap(KEY_FN keymap[256]) {
@@ -189,7 +225,11 @@ static void editor_init_keymap(KEY_FN keymap[256]) {
 }
 
 static void editor_init(struct Editor *editor) {
-  editor_init_keymap(editor->keymap);
+  editor->row = 0;
+  editor->column = 0;
+
+  editor_init_keymap(editor->default_keymap);
+  editor->current_keymap = editor->default_keymap;
   bufffer_init(&editor->buffer);
 }
 
@@ -220,11 +260,13 @@ static void editor_render(struct Editor *editor, struct Terminal *terminal) {
   // Status line.
   const char *message = "Hello world, I am ready for you.";
   term_write(terminal, message, strlen(message));
-  term_set_cursor(terminal);
+
+  // Put the cursor where it belongs.
+  term_set_cursor(terminal, editor->row, editor->column);
 }
 
 static void editor_handle_key(struct Editor *editor, char c) {
-  KEY_FN fn = editor->keymap[(int)c];
+  KEY_FN fn = editor->current_keymap[(int)c];
   if (fn) {
     fn(editor, c);
   }
