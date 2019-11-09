@@ -81,23 +81,30 @@ static void buffer_erase(struct Buffer *buffer, int position) {
   }
 }
 
-static int buffer_rfind(struct Buffer *buffer, char c, int start) {
+static int buffer_find(struct Buffer *buffer, char c, int start) {
   if (start < 0) {
-    return -1;
+    start = 0;
   }
+  while (start < buffer->length) {
+    if (buffer->memory[start] == c) {
+      return start;
+    }
+    start += 1;
+  }
+  return -1;
+}
+
+static int buffer_rfind(struct Buffer *buffer, char c, int start) {
   if (start >= buffer->length) {
     start = buffer->length - 1;
   }
-  char *ptr = buffer->memory + start;
-  for (;;) {
-    if (c == *ptr) {
-      return ptr - buffer->memory;
+  while (start >= 0) {
+    if (buffer->memory[start] == c) {
+      return start;
     }
-    if (ptr == buffer->memory) {
-      return -1;
-    }
-    ptr -= 1;
+    start -= 1;
   }
+  return -1;
 }
 
 struct Terminal {
@@ -210,13 +217,24 @@ static void term_write(struct Terminal *terminal, const char *data,
 }
 
 #define KEY_CONTROL(c) (c - 'a' + 1)
-#define KEY_DEL 127
+
+typedef enum {
+  KEY_CONTROL_H = KEY_CONTROL('h'),
+  KEY_CONTROL_M = KEY_CONTROL('m'),
+  KEY_CONTROL_Q = KEY_CONTROL('q'),
+  KEY_DEL = 127,
+  KEY_LEFT = 256,
+  KEY_RIGHT = 257,
+  KEY_UP = 258,
+  KEY_DOWN = 259,
+  KEY_END,
+} EditorKey;
 
 struct Editor;
 typedef void (*KEY_FN)(struct Editor *, int);
 
 struct Editor {
-  KEY_FN default_keymap[256];
+  KEY_FN default_keymap[KEY_END];
   KEY_FN *current_keymap;
   struct Buffer buffer;
   struct Buffer status_buffer;
@@ -269,6 +287,103 @@ static void editor_backspace(struct Editor *e, int c) {
   }
 }
 
+static char editor_looking_at(struct Editor *e) {
+  if (e->position >= e->buffer.length) {
+    return 0;
+  }
+
+  return e->buffer.memory[e->position];
+}
+
+static int editor_line_start(struct Editor *e, int position) {
+  int line_start = buffer_rfind(&e->buffer, '\n', position - 1);
+  if (line_start < 0) {
+    return 0;
+  } else {
+    return line_start + 1;
+  }
+}
+
+static void editor_next_char(struct Editor *e, int c) {
+  UNUSED(c);
+  if (e->position < e->buffer.length) {
+    if (editor_looking_at(e) == '\n') {
+      e->row += 1;
+      e->column = 0;
+    }
+    e->position++;
+  }
+}
+
+static void editor_prev_char(struct Editor *e, int c) {
+  UNUSED(c);
+  if (e->position > 0) {
+    e->position--;
+    if (editor_looking_at(e) == '\n') {
+      e->row -= 1;
+
+      int line_start = editor_line_start(e, e->position);
+      e->column = e->position - line_start;
+    }
+  }
+}
+
+static void editor_next_line(struct Editor *e, int c) {
+  UNUSED(c);
+
+  // Scan forward to the end of the line; note that we do *not* increment
+  // position here because if we're already at the end of our line we want
+  // our position to be unchanged.
+  int eol = buffer_find(&e->buffer, '\n', e->position);
+  if (eol >= 0) {
+    int line_start = eol + 1;
+    int line_end = buffer_find(&e->buffer, '\n', line_start);
+    if (line_end < 0) {
+      line_end = e->buffer.length;
+    }
+
+    e->row += 1;
+    if (line_start + e->column >= line_end) {
+      e->column = line_end - line_start;
+      e->position = line_end;
+    } else {
+      e->position = line_start + e->column;
+    }
+  } else {
+    // Oh, yeah, we're at the end already.
+    // Can't move forward, just be at the end of the buffer.
+    e->position = e->buffer.length;
+
+    int line_start = editor_line_start(e, e->position);
+    e->column = e->position - line_start;
+  }
+}
+
+static void editor_prev_line(struct Editor *e, int c) {
+  UNUSED(c);
+  if (e->row > 0) {
+    e->row -= 1;
+
+    // Figure out the new position and column based on the previous line
+    // position.
+    int line_start = editor_line_start(e, e->position);
+    int prev_line_start = editor_line_start(e, line_start - 1);
+    if (prev_line_start < 0) {
+      prev_line_start = 0;
+    }
+
+    if (prev_line_start + e->column > line_start) {
+      // The cursor would be placed after the end of the line; move us to the
+      // end of the line.
+      e->column = line_start - prev_line_start;
+      e->position = line_start;
+    } else {
+      // Column remains the same, but the position changes.
+      e->position = prev_line_start + e->column;
+    }
+  }
+}
+
 static void editor_init_keymap(KEY_FN keymap[256]) {
   memset(keymap, 0, sizeof(KEY_FN) * 256);
   for (char c = 1; c < 127; c++) {
@@ -276,10 +391,13 @@ static void editor_init_keymap(KEY_FN keymap[256]) {
       keymap[(int)c] = editor_insert_self;
     }
   }
-  keymap[KEY_CONTROL('q')] = editor_quit;
-  keymap[KEY_CONTROL('m')] = editor_insert_line;
-  keymap[KEY_CONTROL('h')] = editor_backspace;
+  keymap[KEY_CONTROL_Q] = editor_quit;
+  keymap[KEY_CONTROL_M] = editor_insert_line;
   keymap[KEY_DEL] = editor_backspace;
+  keymap[KEY_UP] = editor_prev_line;
+  keymap[KEY_DOWN] = editor_next_line;
+  keymap[KEY_LEFT] = editor_prev_char;
+  keymap[KEY_RIGHT] = editor_next_char;
 }
 
 static void editor_init(struct Editor *editor) {
