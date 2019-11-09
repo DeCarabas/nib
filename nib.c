@@ -107,6 +107,8 @@ static int buffer_rfind(struct Buffer *buffer, char c, int start) {
   return -1;
 }
 
+#define TERM_INPUT_BUFFER_SIZE (10)
+
 struct Terminal {
   struct termios original_mode;
   struct Buffer buffer;
@@ -114,6 +116,9 @@ struct Terminal {
   int output_fileno;
   int rows;
   int columns;
+
+  int input_buffer_count;
+  char input_buffer[TERM_INPUT_BUFFER_SIZE];
 };
 
 static struct Terminal *global_terminal = NULL;
@@ -138,6 +143,7 @@ static void term_init(struct Terminal *terminal, int input_fileno,
   terminal->input_fileno = input_fileno;
   terminal->output_fileno = output_fileno;
   buffer_init(&terminal->buffer);
+  terminal->input_buffer_count = 0;
 
   // Setup raw mode for the terminal.
   if (tcgetattr(input_fileno, &terminal->original_mode) == -1) {
@@ -178,7 +184,12 @@ static void term_atexit(void) {
   }
 }
 
-static int term_read(struct Terminal *terminal) {
+static char term_read_raw(struct Terminal *terminal) {
+  if (terminal->input_buffer_count) {
+    terminal->input_buffer_count -= 1;
+    return terminal->input_buffer[terminal->input_buffer_count];
+  }
+
   int nread;
   char c;
   while ((nread = read(terminal->input_fileno, &c, 1)) != 1) {
@@ -187,6 +198,53 @@ static int term_read(struct Terminal *terminal) {
     }
   }
   return c;
+}
+
+static void term_unread_char(struct Terminal *terminal, char c) {
+  if (terminal->input_buffer_count == TERM_INPUT_BUFFER_SIZE) {
+    die("overflow on unread buffer");
+  }
+  terminal->input_buffer[terminal->input_buffer_count] = c;
+  terminal->input_buffer_count += 1;
+}
+
+#define KEY_CONTROL(c) (c - 'a' + 1)
+
+enum TermKey {
+  KEY_CONTROL_H = KEY_CONTROL('h'),
+  KEY_CONTROL_M = KEY_CONTROL('m'),
+  KEY_CONTROL_Q = KEY_CONTROL('q'),
+  KEY_DEL = 127,
+  KEY_LEFT = 256,
+  KEY_RIGHT = 257,
+  KEY_UP = 258,
+  KEY_DOWN = 259,
+  KEY_LAST_KEY,
+};
+
+static enum TermKey term_read(struct Terminal *terminal) {
+  char c1 = term_read_raw(terminal);
+  if (c1 == '\x1b') {
+    char c2 = term_read_raw(terminal);
+    if (c2 == '[') {
+      char c3 = term_read_raw(terminal);
+      switch (c3) {
+      case 'A':
+        return KEY_UP;
+      case 'B':
+        return KEY_DOWN;
+      case 'C':
+        return KEY_RIGHT;
+      case 'D':
+        return KEY_LEFT;
+      }
+
+      term_unread_char(terminal, c3);
+    }
+
+    term_unread_char(terminal, c2);
+  }
+  return c1;
 }
 
 static void term_set_cursor(struct Terminal *terminal, int row, int col) {
@@ -216,25 +274,11 @@ static void term_write(struct Terminal *terminal, const char *data,
   buffer_append(&terminal->buffer, data, length);
 }
 
-#define KEY_CONTROL(c) (c - 'a' + 1)
-
-typedef enum {
-  KEY_CONTROL_H = KEY_CONTROL('h'),
-  KEY_CONTROL_M = KEY_CONTROL('m'),
-  KEY_CONTROL_Q = KEY_CONTROL('q'),
-  KEY_DEL = 127,
-  KEY_LEFT = 256,
-  KEY_RIGHT = 257,
-  KEY_UP = 258,
-  KEY_DOWN = 259,
-  KEY_END,
-} EditorKey;
-
 struct Editor;
 typedef void (*KEY_FN)(struct Editor *, int);
 
 struct Editor {
-  KEY_FN default_keymap[KEY_END];
+  KEY_FN default_keymap[KEY_LAST_KEY];
   KEY_FN *current_keymap;
   struct Buffer buffer;
   struct Buffer status_buffer;
@@ -310,6 +354,8 @@ static void editor_next_char(struct Editor *e, int c) {
     if (editor_looking_at(e) == '\n') {
       e->row += 1;
       e->column = 0;
+    } else {
+      e->column += 1;
     }
     e->position++;
   }
@@ -324,6 +370,8 @@ static void editor_prev_char(struct Editor *e, int c) {
 
       int line_start = editor_line_start(e, e->position);
       e->column = e->position - line_start;
+    } else {
+      e->column -= 1;
     }
   }
 }
