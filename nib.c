@@ -34,15 +34,32 @@ static void buffer_free(struct Buffer *buffer) {
   buffer->length = 0;
 }
 
-static void buffer_append(struct Buffer *buffer, const char *data, int length) {
-  if (buffer->capacity - buffer->length < length) {
+static void buffer_insert(struct Buffer *buffer, int position, const char *data,
+                          int length) {
+  if (position < 0 || length < 0) {
+    die("negative position or length");
+  }
+
+  // Ensure we have enough space in the buffer.
+  if (buffer->length + length > buffer->capacity) {
     int new_capacity = buffer->capacity * 2;
     buffer->memory = realloc(buffer->memory, sizeof(new_capacity));
     buffer->capacity = new_capacity;
   }
 
-  memcpy(buffer->memory + buffer->length, data, length);
+  // Make a hole, if we need to.
+  if (position < buffer->length) {
+    memmove(buffer->memory + position + length, buffer->memory + position,
+            buffer->length - position);
+  }
+
+  // Copy into the hole.
+  memcpy(buffer->memory + position, data, length);
   buffer->length += length;
+}
+
+static void buffer_append(struct Buffer *buffer, const char *data, int length) {
+  buffer_insert(buffer, buffer->length, data, length);
 }
 
 static void buffer_append_int(struct Buffer *buffer, int value) {
@@ -295,42 +312,6 @@ static void editor_quit(struct Editor *e, int c) {
   exit(0);
 }
 
-static void editor_insert_self(struct Editor *e, int c) {
-  char ch = (char)c;
-  buffer_append(&e->buffer, &ch, 1);
-  e->column += 1;
-  e->position += 1;
-}
-
-static void editor_insert_line(struct Editor *e, int c) {
-  UNUSED(c);
-  char nl = '\n';
-  buffer_append(&e->buffer, &nl, 1);
-  e->column = 0;
-  e->row += 1;
-  e->position += 1;
-}
-
-static void editor_backspace(struct Editor *e, int c) {
-  UNUSED(c);
-  if (e->position > 0) {
-    e->position -= 1;
-    char erased = e->buffer.memory[e->position];
-    buffer_erase(&e->buffer, e->position);
-    if (erased == '\n') {
-      e->row -= 1;
-
-      int line_start = buffer_rfind(&e->buffer, '\n', e->position);
-      if (line_start < 0) {
-        line_start = 0;
-      }
-      e->column = e->position - line_start;
-    } else {
-      e->column -= 1;
-    }
-  }
-}
-
 static char editor_looking_at(struct Editor *e) {
   if (e->position >= e->buffer.length) {
     return 0;
@@ -345,6 +326,39 @@ static int editor_line_start(struct Editor *e, int position) {
     return 0;
   } else {
     return line_start + 1;
+  }
+}
+
+static void editor_insert_self(struct Editor *e, int c) {
+  char ch = (char)c;
+  buffer_insert(&e->buffer, e->position, &ch, 1);
+  e->column += 1;
+  e->position += 1;
+}
+
+static void editor_insert_line(struct Editor *e, int c) {
+  UNUSED(c);
+  char nl = '\n';
+  buffer_insert(&e->buffer, e->position, &nl, 1);
+  e->column = 0;
+  e->row += 1;
+  e->position += 1;
+}
+
+static void editor_backspace(struct Editor *e, int c) {
+  UNUSED(c);
+  if (e->position > 0) {
+    e->position -= 1;
+    char erased = e->buffer.memory[e->position];
+    buffer_erase(&e->buffer, e->position);
+    if (erased == '\n') {
+      e->row -= 1;
+
+      int line_start = editor_line_start(e, e->position);
+      e->column = e->position - line_start;
+    } else {
+      e->column -= 1;
+    }
   }
 }
 
