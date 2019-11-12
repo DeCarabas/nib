@@ -437,8 +437,8 @@ static void editor_prev_line(struct Editor *e, int c) {
     if (prev_line_start + e->column > line_start) {
       // The cursor would be placed after the end of the line; move us to the
       // end of the line.
-      e->column = line_start - prev_line_start;
-      e->position = line_start;
+      e->column = line_start - prev_line_start - 1;
+      e->position = line_start - 1;
     } else {
       // Column remains the same, but the position changes.
       e->position = prev_line_start + e->column;
