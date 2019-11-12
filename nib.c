@@ -228,6 +228,7 @@ static void term_unread_char(struct Terminal *terminal, char c) {
 #define KEY_CONTROL(c) (c - 'a' + 1)
 
 enum TermKey {
+  KEY_NONE = 0,
   KEY_CONTROL_A = KEY_CONTROL('a'),
   KEY_CONTROL_E = KEY_CONTROL('e'),
   KEY_CONTROL_H = KEY_CONTROL('h'),
@@ -296,9 +297,86 @@ static void term_write(struct Terminal *terminal, const char *data,
 struct Editor;
 typedef void (*KEY_FN)(struct Editor *, int);
 
+struct KeyBinding {
+  enum TermKey key;
+  KEY_FN fn;
+};
+
+struct KeyMap {
+  struct KeyBinding *bindings;
+  struct KeyMap *parent;
+  int capacity;
+  int count;
+  int refs;
+};
+
+static void keymap_init(struct KeyMap **map, struct KeyMap *parent) {
+  const int keymap_initial_size = 16;
+  struct KeyMap *m = malloc(sizeof(struct KeyMap));
+  if (!m) {
+    die("Cannot allocate keymap");
+  }
+  m->bindings = malloc(sizeof(struct KeyBinding) * keymap_initial_size);
+  m->parent = parent;
+  m->capacity = keymap_initial_size;
+  m->count = 0;
+  m->refs = 1;
+
+  if (parent) {
+    parent->refs += 1;
+  }
+  *map = m;
+}
+
+static struct KeyMap *keymap_ref(struct KeyMap *map) {
+  map->refs += 1;
+  return map;
+}
+
+static void keymap_free(struct KeyMap **map) {
+  if (map) {
+    struct KeyMap *m = *map;
+    while (m) {
+      m->refs -= 1;
+      if (m->refs) {
+        break;
+      }
+
+      struct KeyMap *parent = m->parent;
+      free(m->bindings);
+      m->bindings = NULL;
+      free(m);
+      m = parent;
+    }
+    *map = NULL;
+  }
+}
+
+static void keymap_bind_key(struct KeyMap *map, int key, KEY_FN fn) {
+  if (map->count == map->capacity) {
+    map->capacity *= 2;
+    map->bindings =
+        realloc(map->bindings, sizeof(struct KeyBinding) * map->capacity);
+  }
+  struct KeyBinding *binding = &(map->bindings[map->count]);
+  binding->key = key;
+  binding->fn = fn;
+  map->count += 1;
+}
+
+static KEY_FN keymap_lookup(struct KeyMap *map, enum TermKey key) {
+  for (int i = map->count - 1; i >= 0; i--) {
+    struct KeyBinding *binding = &map->bindings[i];
+    if (binding->key == key) {
+      return binding->fn;
+    }
+  }
+  return NULL;
+}
+
 struct Editor {
-  KEY_FN default_keymap[KEY_LAST_KEY];
-  KEY_FN *current_keymap;
+  struct KeyMap *default_keymap;
+  struct KeyMap *current_keymap;
   struct Buffer buffer;
   struct Buffer status_buffer;
   int row;
@@ -466,23 +544,22 @@ static void editor_move_end_of_line(struct Editor *e, int c) {
   e->column = e->position - line_start;
 }
 
-static void editor_init_keymap(KEY_FN keymap[256]) {
-  memset(keymap, 0, sizeof(KEY_FN) * 256);
+static void editor_init_keymap(struct KeyMap *keymap) {
   for (char c = 1; c < 127; c++) {
     if (!iscntrl(c)) {
-      keymap[(int)c] = editor_insert_self;
+      keymap_bind_key(keymap, (int)c, editor_insert_self);
     }
   }
-  keymap[KEY_CONTROL_A] = editor_move_beginning_of_line;
-  keymap[KEY_CONTROL_E] = editor_move_end_of_line;
+  keymap_bind_key(keymap, KEY_CONTROL_A, editor_move_beginning_of_line);
+  keymap_bind_key(keymap, KEY_CONTROL_E, editor_move_end_of_line);
 
-  keymap[KEY_CONTROL_Q] = editor_quit;
-  keymap[KEY_CONTROL_M] = editor_insert_line;
-  keymap[KEY_DEL] = editor_backspace;
-  keymap[KEY_UP] = editor_prev_line;
-  keymap[KEY_DOWN] = editor_next_line;
-  keymap[KEY_LEFT] = editor_left_char;
-  keymap[KEY_RIGHT] = editor_right_char;
+  keymap_bind_key(keymap, KEY_CONTROL_Q, editor_quit);
+  keymap_bind_key(keymap, KEY_CONTROL_M, editor_insert_line);
+  keymap_bind_key(keymap, KEY_DEL, editor_backspace);
+  keymap_bind_key(keymap, KEY_UP, editor_prev_line);
+  keymap_bind_key(keymap, KEY_DOWN, editor_next_line);
+  keymap_bind_key(keymap, KEY_LEFT, editor_left_char);
+  keymap_bind_key(keymap, KEY_RIGHT, editor_right_char);
 }
 
 static void editor_init(struct Editor *editor) {
@@ -490,13 +567,19 @@ static void editor_init(struct Editor *editor) {
   editor->column = 0;
   editor->position = 0;
 
+  keymap_init(&editor->default_keymap, NULL);
   editor_init_keymap(editor->default_keymap);
-  editor->current_keymap = editor->default_keymap;
+  editor->current_keymap = keymap_ref(editor->default_keymap);
+
   buffer_init(&editor->buffer);
   buffer_init(&editor->status_buffer);
 }
 
-static void editor_free(struct Editor *editor) { buffer_free(&editor->buffer); }
+static void editor_free(struct Editor *editor) {
+  buffer_free(&editor->buffer);
+  keymap_free(&editor->default_keymap);
+  keymap_free(&editor->current_keymap);
+}
 
 static void editor_render(struct Editor *editor, struct Terminal *terminal) {
   term_clear(terminal);
@@ -536,7 +619,7 @@ static void editor_render(struct Editor *editor, struct Terminal *terminal) {
 
 static void editor_handle_key(struct Editor *editor, int c) {
   editor->last_key = c; // HACKHACK
-  KEY_FN fn = editor->current_keymap[c];
+  KEY_FN fn = keymap_lookup(editor->current_keymap, c);
   if (fn) {
     fn(editor, c);
   }
