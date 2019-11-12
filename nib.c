@@ -228,6 +228,8 @@ static void term_unread_char(struct Terminal *terminal, char c) {
 #define KEY_CONTROL(c) (c - 'a' + 1)
 
 enum TermKey {
+  KEY_CONTROL_A = KEY_CONTROL('a'),
+  KEY_CONTROL_E = KEY_CONTROL('e'),
   KEY_CONTROL_H = KEY_CONTROL('h'),
   KEY_CONTROL_M = KEY_CONTROL('m'),
   KEY_CONTROL_Q = KEY_CONTROL('q'),
@@ -446,6 +448,24 @@ static void editor_prev_line(struct Editor *e, int c) {
   }
 }
 
+static void editor_move_beginning_of_line(struct Editor *e, int c) {
+  UNUSED(c);
+  e->position = editor_line_start(e, e->position);
+  e->column = 0;
+}
+
+static void editor_move_end_of_line(struct Editor *e, int c) {
+  UNUSED(c);
+  int line_start = editor_line_start(e, e->position);
+  int eol = buffer_find(&(e->buffer), '\n', line_start);
+  if (eol < 0) {
+    e->position = e->buffer.length;
+  } else {
+    e->position = eol;
+  }
+  e->column = e->position - line_start;
+}
+
 static void editor_init_keymap(KEY_FN keymap[256]) {
   memset(keymap, 0, sizeof(KEY_FN) * 256);
   for (char c = 1; c < 127; c++) {
@@ -453,6 +473,9 @@ static void editor_init_keymap(KEY_FN keymap[256]) {
       keymap[(int)c] = editor_insert_self;
     }
   }
+  keymap[KEY_CONTROL_A] = editor_move_beginning_of_line;
+  keymap[KEY_CONTROL_E] = editor_move_end_of_line;
+
   keymap[KEY_CONTROL_Q] = editor_quit;
   keymap[KEY_CONTROL_M] = editor_insert_line;
   keymap[KEY_DEL] = editor_backspace;
