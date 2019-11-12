@@ -364,7 +364,7 @@ static void editor_backspace(struct Editor *e, int c) {
   }
 }
 
-static void editor_next_char(struct Editor *e, int c) {
+static void editor_right_char(struct Editor *e, int c) {
   UNUSED(c);
   if (e->position < e->buffer.length) {
     if (editor_looking_at(e) == '\n') {
@@ -377,7 +377,7 @@ static void editor_next_char(struct Editor *e, int c) {
   }
 }
 
-static void editor_prev_char(struct Editor *e, int c) {
+static void editor_left_char(struct Editor *e, int c) {
   UNUSED(c);
   if (e->position > 0) {
     e->position--;
@@ -481,8 +481,8 @@ static void editor_init_keymap(KEY_FN keymap[256]) {
   keymap[KEY_DEL] = editor_backspace;
   keymap[KEY_UP] = editor_prev_line;
   keymap[KEY_DOWN] = editor_next_line;
-  keymap[KEY_LEFT] = editor_prev_char;
-  keymap[KEY_RIGHT] = editor_next_char;
+  keymap[KEY_LEFT] = editor_left_char;
+  keymap[KEY_RIGHT] = editor_right_char;
 }
 
 static void editor_init(struct Editor *editor) {
