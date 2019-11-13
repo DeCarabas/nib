@@ -688,16 +688,19 @@ static void editor_render(struct Editor *editor, struct Terminal *terminal) {
   term_clear(terminal);
 
   int row = 0;
+  int col = 0;
   char *src = editor->buffer.memory;
   for (int i = 0; i < editor->buffer.length; i++) {
     if (src[i] == '\n') {
       term_write(terminal, "\r\n", 2);
       row += 1;
+      col = 0;
       if (row >= terminal->rows - 1) {
         break;
       }
-    } else {
+    } else if (col < terminal->columns) {
       term_write(terminal, src + i, 1);
+      col += 1;
     }
   }
   term_write(terminal, "\r\n", 2);
