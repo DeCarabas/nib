@@ -1,0 +1,26 @@
+{
+  "name": "nibjs",
+  "version": "0.0.1",
+  "description": "Program text as hypermedia",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "dependencies": {
+    "markdown-it": "^10.0.0",
+    "react": "^16.12.0",
+    "react-dom": "^16.12.0"
+  },
+  "engines": {
+    "node": "10.x"
+  },
+  "license": "GPL-3.0",
+  "keywords": [
+    "node",
+    "express"
+  ],
+  "devDependencies": {
+    "electron": "^7.1.2",
+    "prettier": "^1.19.1"
+  }
+}
