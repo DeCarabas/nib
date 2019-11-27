@@ -3,11 +3,21 @@ const reactDom = require("react-dom");
 const storage = require("./storage");
 const wiki = require("./wiki");
 
+const { useState } = react;
 const e = react.createElement;
 
-const store = new storage.Storage("."); // TODO This sucks
+function ContentPage({ initialDocument, store }) {
+  const [root, setRoot] = useState("index");
+  return e(wiki.WikiCard, {
+    key: root,
+    slug: root,
+    store,
+    onNavigate: setRoot
+  });
+}
 
+const store = new storage.Storage("."); // TODO This sucks
 reactDom.render(
-  e(wiki.WikiCard, { slug: "index", store }),
+  e(ContentPage, { initialDocument: "index", store }),
   document.getElementById("root")
 );

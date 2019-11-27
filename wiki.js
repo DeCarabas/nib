@@ -2,9 +2,46 @@ const md = require("markdown-it")();
 const react = require("react");
 
 const e = react.createElement;
-const { useState } = react;
+const { useEffect, useState, useRef } = react;
 
-function WikiCard({ slug, store }) {
+// Configure markdown renderer to do the right thing to links.
+const NIB_SCHEME = "nib://";
+const defaultRenderLinkOpen =
+  md.renderer.rules.link_open ||
+  ((tokens, idx, options, env, self) => self.renderToken(tokens, idx, options));
+
+md.renderer.rules.link_open = (tokens, idx, options, env, self) => {
+  // Check to see if the target of this link is a local wiki thing or what.
+  // Note that I don't really think this is correct, but it migh be close...
+  const token = tokens[idx];
+  const aIndex = token.attrIndex("href");
+  let href = aIndex >= 0 ? token.attrs[aIndex][1] : "";
+  if (!href) {
+    // if target is empty then actually we need to be looking at the next tokens
+    // until we have a link_close I guess?
+    for (let i = idx + 1; i < tokens.length; i++) {
+      if (tokens[i].type != "text") {
+        break;
+      }
+      href += tokens[i].content + " ";
+    }
+    href = href.trim();
+  }
+  if (href.startsWith("http://") || href.startsWith("https://")) {
+    token.attrPush(["target", "_blank"]); // Open in new window.
+  } else {
+    href = NIB_SCHEME + href;
+    if (aIndex >= 0) {
+      token.attrs[aIndex][1] = href;
+    } else {
+      token.attrPush(["href", href]);
+    }
+  }
+
+  return defaultRenderLinkOpen(tokens, idx, options, env, self);
+};
+
+function WikiCard({ slug, store, onNavigate }) {
   const [mode, setMode] = useState("loading");
   const [content, setContent] = useState(undefined);
 
@@ -26,6 +63,7 @@ function WikiCard({ slug, store }) {
     e(WikiContents, {
       mode,
       content,
+      onNavigate,
       onEdit: () => setMode("editing"),
       onSave: newContent => {
         setMode("saving");
@@ -43,14 +81,14 @@ function WikiCard({ slug, store }) {
   );
 }
 
-function WikiContents({ mode, content, onEdit, onSave, onCancel }) {
+function WikiContents({ mode, content, onNavigate, onEdit, onSave, onCancel }) {
   switch (mode) {
     case "loading":
       return e("div", null, "Loading...");
     case "error":
       return e("div", null, "An error occurred, sorry.");
     case "loaded":
-      return e(WikiElement, { content, onEdit });
+      return e(WikiElement, { content, onNavigate, onEdit });
     case "editing":
       return e(WikiEditor, { content, onSave, onCancel });
     case "saving":
@@ -79,14 +117,34 @@ function WikiEditor({ content, onSave, onCancel }) {
   );
 }
 
-function WikiElement({ content, onEdit }) {
+function WikiElement({ content, onNavigate, onEdit }) {
+  const contentElementRef = useRef(null);
+  useEffect(() => {
+    if (contentElementRef.current) {
+      function onClick(evt) {
+        evt.preventDefault();
+        console.log("Clicked yo:", evt.target);
+        const href = evt.target.href;
+        if (href.startsWith(NIB_SCHEME)) {
+          onNavigate(href.substring(NIB_SCHEME.length));
+        }
+      }
+
+      for (let link of contentElementRef.current.getElementsByTagName("a")) {
+        console.log(link);
+        link.addEventListener("click", onClick);
+      }
+    }
+  });
+
   return e(
     "div",
     null,
     e("div", {
       dangerouslySetInnerHTML: {
         __html: md.render(content || "*Nothing here yet!*")
-      }
+      },
+      ref: contentElementRef
     }),
     e(
       "a",
