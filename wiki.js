@@ -1,25 +1,19 @@
 const md = require("markdown-it")();
 const react = require("react");
+const feather = require("feather-icons");
 
 const e = react.createElement;
 const { useEffect, useState, useRef } = react;
 
 // Configure markdown renderer to do the right thing to links.
 const NIB_SCHEME = "nib://";
-const defaultRenderLinkOpen =
-  md.renderer.rules.link_open ||
-  ((tokens, idx, options, env, self) => self.renderToken(tokens, idx, options));
-
-md.renderer.rules.link_open = (tokens, idx, options, env, self) => {
-  // Check to see if the target of this link is a local wiki thing or what.
-  // Note that I don't really think this is correct, but it migh be close...
-  const token = tokens[idx];
+function processLink(token, index, tokens) {
   const aIndex = token.attrIndex("href");
   let href = aIndex >= 0 ? token.attrs[aIndex][1] : "";
   if (!href) {
     // if target is empty then actually we need to be looking at the next tokens
     // until we have a link_close I guess?
-    for (let i = idx + 1; i < tokens.length; i++) {
+    for (let i = index + 1; i < tokens.length; i++) {
       if (tokens[i].type != "text") {
         break;
       }
@@ -37,13 +31,61 @@ md.renderer.rules.link_open = (tokens, idx, options, env, self) => {
       token.attrPush(["href", href]);
     }
   }
+  return token;
+}
 
-  return defaultRenderLinkOpen(tokens, idx, options, env, self);
-};
+function addClass(token, className) {
+  const aIndex = token.attrIndex("class");
+  if (aIndex >= 0) {
+    token.attrs[aIndex][1] += " " + className;
+  } else {
+    token.attrPush(["class", className]);
+  }
+  return token;
+}
+
+// Style text correctly with tachyons? This sucks kinda...
+function processTokens(tokens) {
+  return tokens.map((token, index, tokens) => {
+    // console.log(token);
+    if (token.children) {
+      token.children = processTokens(token.children);
+    }
+    switch (token.type) {
+      case "link_open":
+        return processLink(token, index, tokens);
+      case "heading_open":
+        switch (token.tag) {
+          case "h1":
+            return addClass(token, "f2 lh-solid");
+          case "h2":
+            return addClass(token, "f3 lh-solid");
+          case "h3":
+            return addClass(token, "f4 lh-solid");
+          case "h4":
+            return addClass(token, "f5 lh-solid");
+          case "h5":
+          case "h6":
+            return addClass(token, "f6 lh-solid");
+        }
+        return token;
+      case "paragraph_open":
+        return addClass(token, "measure lh-copy");
+      default:
+        return token;
+    }
+  });
+}
+
+const defaultRender = md.renderer.render.bind(md.renderer);
+md.renderer.render = (tokens, options, env) =>
+  defaultRender(processTokens(tokens), options, env);
 
 function WikiCard({ slug, store, onNavigate }) {
   const [mode, setMode] = useState("loading");
   const [content, setContent] = useState(undefined);
+  const [height, setHeight] = useState(undefined);
+  const contentRef = useRef(null);
 
   if (mode === "loading") {
     store.getDocument(slug, (error, result) => {
@@ -56,10 +98,38 @@ function WikiCard({ slug, store, onNavigate }) {
     });
   }
 
+  useEffect(() => {
+    function maybeSetHeight(_) {
+      if (mode === "loaded" && contentRef.current) {
+        const contentElement = contentRef.current;
+        const contentHeight = contentElement.getBoundingClientRect().height;
+        if (contentHeight && contentHeight !== height) {
+          setHeight(contentHeight);
+          console.log("height:", contentHeight);
+        }
+      }
+    }
+
+    maybeSetHeight(null);
+    window.addEventListener("resize", maybeSetHeight);
+    return () => window.removeEventListener("resize", maybeSetHeight);
+  });
+
+  const outerStyle = {
+    // We capture the height in "loaded", but fix the height in editing.
+    // If we accidentally set the height when the mode is "loaded" then rounding
+    // errors cause us to not converge. :P
+    height: mode === "editing" ? height : undefined,
+
+    // This causes the reported height of the box to match the actual content
+    // height, that is, the box stretches to accomodate the margins of the inner
+    // content. (See "margin collapse".)
+    overflow: "auto"
+  };
+
   return e(
     "div",
-    null,
-    e("h1", null, slug),
+    { ref: contentRef, style: outerStyle },
     e(WikiContents, {
       mode,
       content,
@@ -81,7 +151,15 @@ function WikiCard({ slug, store, onNavigate }) {
   );
 }
 
-function WikiContents({ mode, content, onNavigate, onEdit, onSave, onCancel }) {
+function WikiContents({
+  mode,
+  content,
+  editHeight,
+  onNavigate,
+  onEdit,
+  onSave,
+  onCancel
+}) {
   switch (mode) {
     case "loading":
       return e("div", null, "Loading...");
@@ -90,7 +168,7 @@ function WikiContents({ mode, content, onNavigate, onEdit, onSave, onCancel }) {
     case "loaded":
       return e(WikiElement, { content, onNavigate, onEdit });
     case "editing":
-      return e(WikiEditor, { content, onSave, onCancel });
+      return e(WikiEditor, { height: editHeight, content, onSave, onCancel });
     case "saving":
       return e("div", null, "Saving, please wait...");
   }
@@ -100,19 +178,28 @@ function WikiEditor({ content, onSave, onCancel }) {
   const [text, setText] = useState(content || "");
 
   return e(
-    "form",
+    "div",
     null,
-    e("textarea", {
-      rows: 22,
-      cols: 80,
-      value: text,
-      onChange: e => setText(e.target.value)
-    }),
     e(
-      "div",
+      "form",
       null,
-      e("button", { onClick: () => onSave(text) }, "Save"),
-      e("button", { onClick: onCancel }, "Cancel")
+      e(
+        "div",
+        {
+          className: "absolute top-1 bottom-2 left-1 right-1"
+        },
+        e("textarea", {
+          className: "w-100 h-100",
+          value: text,
+          onChange: e => setText(e.target.value)
+        })
+      ),
+      e(
+        "div",
+        { className: "absolute bottom-0 right-0" },
+        e("button", { onClick: () => onSave(text) }, "Save"),
+        e("button", { onClick: onCancel }, "Cancel")
+      )
     )
   );
 }
@@ -139,7 +226,7 @@ function WikiElement({ content, onNavigate, onEdit }) {
 
   return e(
     "div",
-    null,
+    { className: "sans-serif" },
     e("div", {
       dangerouslySetInnerHTML: {
         __html: md.render(content || "*Nothing here yet!*")
@@ -147,12 +234,20 @@ function WikiElement({ content, onNavigate, onEdit }) {
       ref: contentElementRef
     }),
     e(
-      "a",
-      {
-        onClick: onEdit,
-        style: { color: "blue", textDecoration: "underline", cursor: "pointer" }
-      },
-      "click here to edit this"
+      "div",
+      { className: "absolute top-1 right-1" },
+      e(
+        "a",
+        {
+          onClick: onEdit,
+          style: { cursor: "pointer" }
+        },
+        e("div", {
+          dangerouslySetInnerHTML: {
+            __html: feather.icons["edit"].toSvg()
+          }
+        })
+      )
     )
   );
 }
