@@ -105,7 +105,6 @@ function WikiCard({ slug, store, onNavigate }) {
         const contentHeight = contentElement.getBoundingClientRect().height;
         if (contentHeight && contentHeight !== height) {
           setHeight(contentHeight);
-          console.log("height:", contentHeight);
         }
       }
     }
@@ -210,7 +209,6 @@ function WikiElement({ content, onNavigate, onEdit }) {
     if (contentElementRef.current) {
       function onClick(evt) {
         evt.preventDefault();
-        console.log("Clicked yo:", evt.target);
         const href = evt.target.href;
         if (href.startsWith(NIB_SCHEME)) {
           onNavigate(href.substring(NIB_SCHEME.length));
@@ -218,7 +216,6 @@ function WikiElement({ content, onNavigate, onEdit }) {
       }
 
       for (let link of contentElementRef.current.getElementsByTagName("a")) {
-        console.log(link);
         link.addEventListener("click", onClick);
       }
     }
