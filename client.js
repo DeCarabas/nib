@@ -3,58 +3,63 @@ const reactDom = require("react-dom");
 const storage = require("./storage");
 const wiki = require("./wiki");
 
-const { useEffect, useRef, useState } = react;
 const e = react.createElement;
 
-function ContentPage({ initialDocument, store }) {
-  const [history, setHistory] = useState(["index"]);
-  const cardRefs = useRef([]);
+class ContentPage extends react.Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      history: [[props.initialDocument]],
+      focus: { columnIndex: 0, cardIndex: 0 }
+    };
+    this.cardRefs = [[]];
+  }
 
-  useEffect(() => {
-    cardRefs.current = cardRefs.current.slice(0, history.length);
-    if (cardRefs.current) {
-      const focus = cardRefs.current[history.length - 1];
-      if (focus) {
-        const rect = focus.getBoundingClientRect();
-        window.scrollTo({
-          left: Math.max(0, rect.left - 10),
-          top: Math.max(0, rect.top - 10),
-          behavior: "smooth"
-        });
-      }
-    }
-  });
+  navigate(columnIndex, cardIndex, target) {
+    const newHistory = this.state.history.slice();
+    const column = newHistory[columnIndex];
+    // TODO: Don't insert if the target is already in the column.
+    newHistory[columnIndex] = column
+      .slice(0, cardIndex + 1)
+      .concat([target], column.slice(cardIndex + 1));
 
-  // Rebuild the grid. As history becomes more sophisticated so will this.
-  const columns = history.map(_ => "auto").join(" ");
-  const cards = history.map((slug, i) =>
-    e(
+    this.setState({
+      history: newHistory,
+      focus: { columnIndex, cardIndex: cardIndex + 1 }
+    });
+  }
+
+  render() {
+    const columns = this.state.history.map(_ => "auto").join(" ");
+    const cards = this.state.history.map((column, columnIndex) =>
+      column.map((slug, cardIndex) => {
+        const key = columnIndex.toString() + ":" + cardIndex.toString();
+        return e(
+          "div",
+          {
+            key,
+            style: { gridColumnStart: columnIndex + 1 },
+            ref: el => (this.cardRefs[columnIndex][cardIndex] = el)
+          },
+          e(Card, {
+            key,
+            slug,
+            store,
+            onNavigate: slug => this.navigate(columnIndex, cardIndex, slug)
+          })
+        );
+      })
+    );
+
+    return e(
       "div",
       {
-        key: i.toString(),
-        style: { gridColumnStart: i + 1 },
-        ref: el => (cardRefs.current[i] = el)
+        style: { display: "grid", gridTemplateColumns: columns },
+        overflow: "scroll"
       },
-      e(Card, {
-        slug,
-        store,
-        onNavigate: x => {
-          const newHistory = history.slice(0, i + 1);
-          newHistory.push(x);
-          setHistory(newHistory);
-        }
-      })
-    )
-  );
-
-  return e(
-    "div",
-    {
-      style: { display: "grid", gridTemplateColumns: columns },
-      overflow: "scroll"
-    },
-    cards
-  );
+      cards
+    );
+  }
 }
 
 function Card({ slug, store, onNavigate }) {

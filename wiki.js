@@ -98,21 +98,23 @@ function WikiCard({ slug, store, onNavigate }) {
     });
   }
 
-  useEffect(() => {
-    function maybeSetHeight(_) {
-      if (mode === "loaded" && contentRef.current) {
-        const contentElement = contentRef.current;
-        const contentHeight = contentElement.getBoundingClientRect().height;
-        if (contentHeight && contentHeight !== height) {
-          setHeight(contentHeight);
-        }
-      }
-    }
+  // useEffect(() => {
+  //   const maybeSetHeight = _ => {
+  //     if (mode === "loaded" && contentRef.current) {
+  //       const contentElement = contentRef.current;
+  //       const contentHeight = contentElement.getBoundingClientRect().height;
+  //       if (contentHeight && contentHeight !== height) {
+  //         setHeight(contentHeight);
+  //       }
+  //     }
+  //   };
 
-    maybeSetHeight(null);
-    window.addEventListener("resize", maybeSetHeight);
-    return () => window.removeEventListener("resize", maybeSetHeight);
-  });
+  //   maybeSetHeight(null);
+  //   window.addEventListener("resize", maybeSetHeight);
+  //   return () => {
+  //     window.removeEventListener("resize", maybeSetHeight);
+  //   };
+  // }, [mode, content]);
 
   const outerStyle = {
     // We capture the height in "loaded", but fix the height in editing.
@@ -216,7 +218,7 @@ function WikiElement({ content, onNavigate, onEdit }) {
       }
 
       for (let link of contentElementRef.current.getElementsByTagName("a")) {
-        link.addEventListener("click", onClick);
+        link.onclick = onClick;
       }
     }
   });
