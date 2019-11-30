@@ -12,7 +12,6 @@ class ContentPage extends react.Component {
       history: [[props.initialDocument]],
       focus: { columnIndex: 0, cardIndex: 0 }
     };
-    this.cardRefs = [[]];
   }
 
   navigate(columnIndex, cardIndex, target) {
@@ -30,21 +29,40 @@ class ContentPage extends react.Component {
   }
 
   render() {
+    const { columnIndex: focusColumn, cardIndex: focusCard } = this.state.focus;
     const columns = this.state.history.map(_ => "auto").join(" ");
     const cards = this.state.history.map((column, columnIndex) =>
       column.map((slug, cardIndex) => {
+        // If this is the focused card then when we get the ref we scroll to
+        // the correct position.
+        const focused = columnIndex === focusColumn && cardIndex == focusCard;
+        const ref = focused
+          ? el => {
+              if (el) {
+                const rect = el.getBoundingClientRect();
+                window.requestAnimationFrame(() =>
+                  window.scrollTo({
+                    top: Math.max(0, rect.top - 10),
+                    left: Math.max(0, rect.left - 10),
+                    behavior: "smooth"
+                  })
+                );
+              }
+            }
+          : null;
         const key = columnIndex.toString() + ":" + cardIndex.toString();
         return e(
           "div",
           {
             key,
-            style: { gridColumnStart: columnIndex + 1 },
-            ref: el => (this.cardRefs[columnIndex][cardIndex] = el)
+            ref,
+            style: { gridColumnStart: columnIndex + 1 }
           },
           e(Card, {
             key,
             slug,
             store,
+            focused,
             onNavigate: slug => this.navigate(columnIndex, cardIndex, slug)
           })
         );
@@ -62,10 +80,10 @@ class ContentPage extends react.Component {
   }
 }
 
-function Card({ slug, store, onNavigate }) {
+function Card({ focused, slug, store, onNavigate }) {
   return e(
     "div",
-    { className: "ba pa3 ma2 w6 relative" },
+    { className: "pa3 ma2 ba w6 relative" + (focused ? "" : " b--light-gray") },
     e(wiki.WikiCard, { slug, store, onNavigate })
   );
 }
