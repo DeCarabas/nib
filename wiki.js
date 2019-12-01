@@ -42,7 +42,6 @@ function parseWikiLink(state, silent) {
 
     const token = state.push("wiki-link", "a", 0);
     token.meta = { target, text };
-    console.log("Yeah:", token);
   }
 
   state.pos = end + 2;
