@@ -5,32 +5,62 @@ const feather = require("feather-icons");
 const e = react.createElement;
 const { useEffect, useState, useRef } = react;
 
-// Configure markdown renderer to do the right thing to links.
-const NIB_SCHEME = "nib://";
-function processLink(token, index, tokens) {
-  const aIndex = token.attrIndex("href");
-  let href = aIndex >= 0 ? token.attrs[aIndex][1] : "";
-  if (!href) {
-    // if target is empty then actually we need to be looking at the next tokens
-    // until we have a link_close I guess?
-    for (let i = index + 1; i < tokens.length; i++) {
-      if (tokens[i].type != "text") {
+// Handle wikimedia-style links.
+function parseWikiLink(state, silent) {
+  const source = state.src;
+  let pos = state.pos;
+  let matched = false;
+  if (source[pos] === "[" && source[pos + 1] === "[") {
+    // scan forward until we find the close...
+    pos += 2;
+    while (pos < source.length) {
+      if (source[pos] === "]" && source[pos + 1] === "]") {
+        matched = true;
         break;
       }
-      href += tokens[i].content + " ";
-    }
-    href = href.trim();
-  }
-  if (href.startsWith("http://") || href.startsWith("https://")) {
-    token.attrPush(["target", "_blank"]); // Open in new window.
-  } else {
-    href = NIB_SCHEME + href;
-    if (aIndex >= 0) {
-      token.attrs[aIndex][1] = href;
-    } else {
-      token.attrPush(["href", href]);
+      // exit out early if we see something wierd
+      if (source[pos] === "[") {
+        break;
+      }
+      pos += 1;
     }
   }
+
+  if (!matched) {
+    return false;
+  }
+
+  const start = state.pos + 2;
+  const end = pos;
+  if (!silent) {
+    const match = source.slice(start, end).trim();
+    const pipeIndex = match.indexOf("|");
+    const [target, text] =
+      pipeIndex >= 0
+        ? [match.slice(0, pipeIndex).trim(), match.slice(pipeIndex + 1).trim()]
+        : [match, match];
+
+    const token = state.push("wiki-link", "a", 0);
+    token.meta = { target, text };
+    console.log("Yeah:", token);
+  }
+
+  state.pos = end + 2;
+  return true;
+}
+md.inline.ruler.push("wikiLinks", parseWikiLink);
+
+// Render wikimedia style links.
+const NIB_SCHEME = "nib://";
+function renderWikiLinkHTML(tokens, id, _options, _env) {
+  const { target, text } = tokens[id].meta;
+  return '<a href="' + NIB_SCHEME + target + '">' + text + "</a>";
+}
+md.renderer.rules["wiki-link"] = renderWikiLinkHTML;
+
+// Configure markdown renderer to do the right thing to links.
+function processLink(token, index, tokens) {
+  token.attrPush(["target", "_blank"]); // Open in new window.
   return token;
 }
 
@@ -184,6 +214,7 @@ function WikiContents({
 
 function WikiEditor({ slug, content, onSave, onCancel }) {
   const [text, setText] = useState(content || "");
+  const [newSlug, setNewSlug] = useState(slug);
 
   return e(
     "div",
@@ -195,7 +226,11 @@ function WikiEditor({ slug, content, onSave, onCancel }) {
         height: "100%"
       }
     },
-    e("input", { value: slug, readOnly: true, style: { gridRow: 1 } }),
+    e("input", {
+      style: { gridRow: 1 },
+      value: newSlug,
+      onChange: e => setNewSlug(e.target.value)
+    }),
     e(
       "div",
       { style: { gridRow: 2 } },
