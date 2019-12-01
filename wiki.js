@@ -119,8 +119,9 @@ function WikiCard({ slug, store, onNavigate }) {
   const outerStyle = {
     // We capture the height in "loaded", but fix the height in editing.
     // If we accidentally set the height when the mode is "loaded" then rounding
-    // errors cause us to not converge. :P
-    height: mode === "editing" ? height : undefined,
+    // errors cause us to not converge. :P (104 is a magic number where we don't
+    // want the default height, measured by experiment.)
+    height: mode === "editing" && height >= 104 ? height : undefined,
 
     // This causes the reported height of the box to match the actual content
     // height, that is, the box stretches to accomodate the margins of the inner
@@ -132,6 +133,7 @@ function WikiCard({ slug, store, onNavigate }) {
     "div",
     { ref: contentRef, style: outerStyle },
     e(WikiContents, {
+      slug,
       mode,
       content,
       onNavigate,
@@ -153,9 +155,9 @@ function WikiCard({ slug, store, onNavigate }) {
 }
 
 function WikiContents({
+  slug,
   mode,
   content,
-  editHeight,
   onNavigate,
   onEdit,
   onSave,
@@ -169,38 +171,45 @@ function WikiContents({
     case "loaded":
       return e(WikiElement, { content, onNavigate, onEdit });
     case "editing":
-      return e(WikiEditor, { height: editHeight, content, onSave, onCancel });
+      return e(WikiEditor, {
+        slug,
+        content,
+        onSave,
+        onCancel
+      });
     case "saving":
       return e("div", null, "Saving, please wait...");
   }
 }
 
-function WikiEditor({ content, onSave, onCancel }) {
+function WikiEditor({ slug, content, onSave, onCancel }) {
   const [text, setText] = useState(content || "");
 
   return e(
     "div",
-    null,
+    {
+      style: {
+        display: "grid",
+        gridTemplateRows: "1rem auto 2rem",
+        gridRowGap: "0.5rem",
+        height: "100%"
+      }
+    },
+    e("input", { value: slug, readOnly: true, style: { gridRow: 1 } }),
     e(
-      "form",
-      null,
-      e(
-        "div",
-        {
-          className: "absolute top-1 bottom-2 left-1 right-1"
-        },
-        e("textarea", {
-          className: "w-100 h-100",
-          value: text,
-          onChange: e => setText(e.target.value)
-        })
-      ),
-      e(
-        "div",
-        { className: "absolute bottom-0 right-0" },
-        e("button", { onClick: () => onSave(text) }, "Save"),
-        e("button", { onClick: onCancel }, "Cancel")
-      )
+      "div",
+      { style: { gridRow: 2 } },
+      e("textarea", {
+        className: "w-100 h-100",
+        value: text,
+        onChange: e => setText(e.target.value)
+      })
+    ),
+    e(
+      "div",
+      { style: { gridRow: 3 } },
+      e("button", { onClick: () => onSave(text) }, "Save"),
+      e("button", { onClick: onCancel }, "Cancel")
     )
   );
 }
