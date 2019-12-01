@@ -17,18 +17,23 @@ class Storage {
   getDocument(name, callback) {
     const slug = slugForName(name);
     fs.readFile(this.root + "/" + slug, (err, data) => {
-      const content = data ? data.toString("utf8") : null;
       if (err && err.code != "ENOENT") {
         callback(err, null);
       } else {
-        callback(null, { content });
+        try {
+          const content = data ? JSON.parse(data.toString("utf8")) : null;
+          callback(null, { content });
+        } catch (err) {
+          callback(err, null);
+        }
       }
     });
   }
 
-  setDocument(name, content, callback) {
+  setDocument(name, contentType, content, callback) {
     const slug = slugForName(name);
-    fs.writeFile(this.root + "/" + slug, Buffer.from(content, "utf8"), err => {
+    const data = Buffer.from(JSON.stringify({ contentType, content }), "utf8");
+    fs.writeFile(this.root + "/" + slug, data, err => {
       callback(err);
     });
   }

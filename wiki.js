@@ -170,7 +170,7 @@ function WikiCard({ slug, store, onNavigate }) {
       onEdit: () => setMode("editing"),
       onSave: newContent => {
         setMode("saving");
-        store.setDocument(slug, newContent, error => {
+        store.setDocument(slug, "wiki", newContent, error => {
           if (error) {
             setMode("error");
           } else {
