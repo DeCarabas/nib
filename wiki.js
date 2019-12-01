@@ -57,7 +57,7 @@ function renderWikiLinkHTML(tokens, id, _options, _env) {
 }
 md.renderer.rules["wiki-link"] = renderWikiLinkHTML;
 
-// Configure markdown renderer to do the right thing to links.
+// Configure markdown renderer to add the right classes to stuff.
 function processLink(token, index, tokens) {
   token.attrPush(["target", "_blank"]); // Open in new window.
   return token;
@@ -121,7 +121,8 @@ function WikiCard({ slug, store, onNavigate }) {
       if (error) {
         setMode("error");
       } else {
-        setContent(result);
+        const { content } = result;
+        setContent(content);
         setMode("loaded");
       }
     });

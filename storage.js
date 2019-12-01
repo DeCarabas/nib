@@ -21,7 +21,7 @@ class Storage {
       if (err && err.code != "ENOENT") {
         callback(err, null);
       } else {
-        callback(null, content);
+        callback(null, { content });
       }
     });
   }
