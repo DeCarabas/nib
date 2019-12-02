@@ -1,9 +1,13 @@
-const md = require("markdown-it")();
-const react = require("react");
-const feather = require("feather-icons");
+import "https://unpkg.com/feather-icons@4.24.1/dist/feather.js?module";
+import "https://unpkg.com/markdown-it@10.0.0/dist/markdown-it.js";
+import { h } from "https://unpkg.com/preact@latest?module";
+import {
+  useState,
+  useEffect,
+  useRef
+} from "https://unpkg.com/preact@latest/hooks/dist/hooks.module.js?module";
 
-const e = react.createElement;
-const { useEffect, useState, useRef } = react;
+const md = window.markdownit();
 
 // Handle wikimedia-style links.
 function parseWikiLink(state, silent) {
@@ -110,7 +114,7 @@ const defaultRender = md.renderer.render.bind(md.renderer);
 md.renderer.render = (tokens, options, env) =>
   defaultRender(processTokens(tokens), options, env);
 
-function WikiCard({ slug, store, onNavigate }) {
+export function WikiCard({ slug, store, onNavigate }) {
   const [mode, setMode] = useState("loading");
   const [content, setContent] = useState(undefined);
   const [height, setHeight] = useState(undefined);
@@ -159,10 +163,10 @@ function WikiCard({ slug, store, onNavigate }) {
     overflow: "auto"
   };
 
-  return e(
+  return h(
     "div",
     { ref: contentRef, style: outerStyle },
-    e(WikiContents, {
+    h(WikiContents, {
       slug,
       mode,
       content,
@@ -195,20 +199,20 @@ function WikiContents({
 }) {
   switch (mode) {
     case "loading":
-      return e("div", null, "Loading...");
+      return h("div", null, "Loading...");
     case "error":
-      return e("div", null, "An error occurred, sorry.");
+      return h("div", null, "An error occurred, sorry.");
     case "loaded":
-      return e(WikiElement, { content, onNavigate, onEdit });
+      return h(WikiElement, { content, onNavigate, onEdit });
     case "editing":
-      return e(WikiEditor, {
+      return h(WikiEditor, {
         slug,
         content,
         onSave,
         onCancel
       });
     case "saving":
-      return e("div", null, "Saving, please wait...");
+      return h("div", null, "Saving, please wait...");
   }
 }
 
@@ -216,7 +220,7 @@ function WikiEditor({ slug, content, onSave, onCancel }) {
   const [text, setText] = useState(content || "");
   const [newSlug, setNewSlug] = useState(slug);
 
-  return e(
+  return h(
     "div",
     {
       style: {
@@ -226,25 +230,25 @@ function WikiEditor({ slug, content, onSave, onCancel }) {
         height: "100%"
       }
     },
-    e("input", {
+    h("input", {
       style: { gridRow: 1 },
       value: newSlug,
       onChange: e => setNewSlug(e.target.value)
     }),
-    e(
+    h(
       "div",
       { style: { gridRow: 2 } },
-      e("textarea", {
+      h("textarea", {
         className: "w-100 h-100",
         value: text,
         onChange: e => setText(e.target.value)
       })
     ),
-    e(
+    h(
       "div",
       { style: { gridRow: 3 } },
-      e("button", { onClick: () => onSave(text) }, "Save"),
-      e("button", { onClick: onCancel }, "Cancel")
+      h("button", { onClick: () => onSave(text) }, "Save"),
+      h("button", { onClick: onCancel }, "Cancel")
     )
   );
 }
@@ -267,25 +271,25 @@ function WikiElement({ content, onNavigate, onEdit }) {
     }
   });
 
-  return e(
+  return h(
     "div",
     { className: "sans-serif" },
-    e("div", {
+    h("div", {
       dangerouslySetInnerHTML: {
         __html: md.render(content || "*Nothing here yet!*")
       },
       ref: contentElementRef
     }),
-    e(
+    h(
       "div",
       { className: "absolute top-1 right-1" },
-      e(
+      h(
         "a",
         {
           onClick: onEdit,
           style: { cursor: "pointer" }
         },
-        e("div", {
+        h("div", {
           dangerouslySetInnerHTML: {
             __html: feather.icons["edit"].toSvg()
           }
@@ -294,5 +298,3 @@ function WikiElement({ content, onNavigate, onEdit }) {
     )
   );
 }
-
-module.exports = { WikiCard };

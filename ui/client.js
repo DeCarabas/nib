@@ -1,11 +1,8 @@
-const react = require("react");
-const reactDom = require("react-dom");
-const storage = require("./storage");
-const wiki = require("./wiki");
+import { h, Component, render } from "https://unpkg.com/preact@latest?module";
+import { Storage } from "./storage.js";
+import { WikiCard } from "./wiki.js";
 
-const e = react.createElement;
-
-class ContentPage extends react.Component {
+class ContentPage extends Component {
   constructor(props) {
     super(props);
     this.state = {
@@ -51,14 +48,14 @@ class ContentPage extends react.Component {
             }
           : null;
         const key = columnIndex.toString() + ":" + cardIndex.toString();
-        return e(
+        return h(
           "div",
           {
             key,
             ref,
             style: { gridColumnStart: columnIndex + 1 }
           },
-          e(Card, {
+          h(Card, {
             key,
             slug,
             store,
@@ -69,7 +66,7 @@ class ContentPage extends react.Component {
       })
     );
 
-    return e(
+    return h(
       "div",
       {
         style: { display: "grid", gridTemplateColumns: columns },
@@ -81,15 +78,15 @@ class ContentPage extends react.Component {
 }
 
 function Card({ focused, slug, store, onNavigate }) {
-  return e(
+  return h(
     "div",
     { className: "pa3 ma2 ba w6 relative" + (focused ? "" : " b--light-gray") },
-    e(wiki.WikiCard, { slug, store, onNavigate })
+    h(WikiCard, { slug, store, onNavigate })
   );
 }
 
-const store = new storage.Storage("."); // TODO This sucks
-reactDom.render(
-  e(ContentPage, { initialDocument: "index", store }),
+const store = new Storage("."); // TODO This sucks
+render(
+  h(ContentPage, { initialDocument: "index", store }),
   document.getElementById("root")
 );
