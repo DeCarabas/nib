@@ -1,0 +1,25 @@
+{
+  "name": "nibjs",
+  "version": "0.0.1",
+  "description": "Program text as hypermedia",
+  "main": "server.js",
+  "scripts": {
+    "start": "node ."
+  },
+  "dependencies": {
+    "express": "^4.17.1",
+    "sqlite": "^3.0.3"
+  },
+  "engines": {
+    "node": "12.x"
+  },
+  "license": "GPL-3.0",
+  "keywords": [
+    "node",
+    "express"
+  ],
+  "devDependencies": {
+    "open": "^7.0.0",
+    "prettier": "^1.19.1"
+  }
+}
