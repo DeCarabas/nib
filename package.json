@@ -3,6 +3,9 @@
   "version": "0.0.1",
   "description": "Program text as hypermedia",
   "main": "server.js",
+  "repository": {
+    "url": "https://github.com/decarabas/nib"
+  },
   "scripts": {
     "start": "node ."
   },

@@ -29,7 +29,7 @@ app.get("/image/local/content/:id", (request, response) => {
 app.put("/image/local/content/:id", (request, response) => {
   db.run(
     `INSERT INTO Documents (name, content, contentType) VALUES (?, ?, ?)
-     ON CONFLICT(name) 
+     ON CONFLICT(name)
      DO UPDATE SET content=excluded.content, contentType=excluded.contentType`,
     [request.params.id, request.body.content, request.body.contentType],
     (_, err) => {
@@ -64,15 +64,15 @@ const db = new sqlite.Database(".data/nib.db", err => {
   db.serialize(() => {
     db.run(
       `CREATE TABLE IF NOT EXISTS Documents (
-          name text primary key, 
-          contentType text, 
+          name text primary key,
+          contentType text,
           content text
         )`
     );
   });
   listener = app.listen(process.env.PORT, () => {
     console.log(`Your app is listening on port ${listener.address().port}`);
-    if (process.env.OPENBROWSER) {
+    if (process.env.NODE_ENV !== "production") {
       require("open")("http://localhost:" + listener.address().port + "/");
     }
   });
