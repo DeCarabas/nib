@@ -1,3 +1,4 @@
+#include "sqlite3.h"
 #include <ctype.h>
 #include <errno.h>
 #include <stdio.h>
@@ -452,12 +453,13 @@ struct Editor {
   int position;
 
   int last_key;
+  int running;
 };
 
 static void editor_quit(struct Editor *e, int c) {
   UNUSED(e);
   UNUSED(c);
-  exit(0);
+  e->running = 0;
 }
 
 static char editor_looking_at(struct Editor *e) {
@@ -669,6 +671,7 @@ static void editor_init(struct Editor *editor) {
   editor->row = 0;
   editor->column = 0;
   editor->position = 0;
+  editor->running = 1;
 
   keymap_init(&editor->default_keymap, NULL);
   editor_init_keymap(editor->default_keymap);
@@ -739,14 +742,121 @@ static void editor_handle_key(struct Editor *editor, int c) {
   }
 }
 
+struct Image {
+  sqlite3 *db;
+  sqlite3_stmt *get_document;
+};
+
+static int image_open(struct Image *image, const char *file) {
+  image->db = NULL;
+  image->get_document = NULL;
+  int rc = sqlite3_open(file, &image->db);
+  if (rc) {
+    return rc;
+  }
+
+  // This is where schema migrations go, if we need them.
+  // Probably we just need the core schema though: this will be enough to get
+  // started I think.
+  char *error_message;
+  rc = sqlite3_exec(image->db,
+                    "CREATE TABLE IF NOT EXISTS Properties ("
+                    "  name VARCHAR PRIMARY KEY,"
+                    "  value VARCHAR"
+                    ")",
+                    NULL, NULL, &error_message);
+  if (rc) {
+    die(error_message);
+  }
+  rc = sqlite3_exec(image->db,
+                    "CREATE TABLE IF NOT EXISTS Documents ("
+                    "  name VARCHAR,"
+                    "  kind VARCHAR,"
+                    "  data VARCHAR,"
+                    "  PRIMARY KEY (name, kind)"
+                    ")",
+                    NULL, NULL, &error_message);
+  if (rc) {
+    die(error_message);
+  }
+
+  rc = sqlite3_prepare_v2(image->db,
+                          "SELECT name, kind, data "
+                          "FROM Documents "
+                          "WHERE name=?",
+                          -1, &image->get_document, NULL);
+  if (rc) {
+    die("prepare get_document");
+  }
+
+  return 0;
+}
+
+#define QUERY_PARAM_GET_DOCUMENT_NAME (1)
+#define QUERY_RESULT_GET_DOCUMENT_DATA (2)
+
+static int image_get_document(struct Image *image, struct Buffer *out,
+                              const char *name, int nameLength) {
+  int rc;
+  rc = sqlite3_reset(image->get_document);
+  if (rc) {
+    die("get_document -> reset");
+  }
+
+  rc = sqlite3_bind_text(image->get_document, QUERY_PARAM_GET_DOCUMENT_NAME,
+                         name, nameLength, NULL);
+  if (rc) {
+    die("get_document -> bind name");
+  }
+
+  // What do I do if I don't find anything?
+  rc = sqlite3_step(image->get_document);
+  if (rc == SQLITE_DONE) {
+    return 2; // Not found.
+  }
+  if (rc != SQLITE_ROW) {
+    die("get_document -> step");
+  }
+
+  int document_length =
+      sqlite3_column_bytes(image->get_document, QUERY_RESULT_GET_DOCUMENT_DATA);
+  const char *text = (const char *)sqlite3_column_text(
+      image->get_document, QUERY_RESULT_GET_DOCUMENT_DATA);
+
+  buffer_clear(out);
+  buffer_append(out, text, document_length);
+  return 0; // OK.
+}
+
+static void image_close(struct Image *image) {
+  if (image->get_document) {
+    sqlite3_finalize(image->get_document);
+    image->get_document = NULL;
+  }
+  if (image->db) {
+    sqlite3_close(image->db);
+    image->db = NULL;
+  }
+}
+
 int main() {
   struct Terminal terminal;
   term_init(&terminal, STDIN_FILENO, STDOUT_FILENO);
 
+  struct Image image;
+  if (image_open(&image, "core.nib")) {
+    die("Unable to load image.");
+  }
+
   struct Editor editor;
   editor_init(&editor);
 
-  for (;;) {
+  {
+    const char *init_name = "init";
+    image_get_document(&image, &editor.buffer, init_name, strlen(init_name));
+  }
+
+  while (editor.running) {
     editor_render(&editor, &terminal);
     term_draw(&terminal);
 
@@ -755,6 +865,7 @@ int main() {
   }
 
   editor_free(&editor);
+  image_close(&image);
   term_free(&terminal);
   return 0;
 }
