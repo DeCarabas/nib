@@ -115,109 +115,11 @@ const defaultRender = md.renderer.render.bind(md.renderer);
 md.renderer.render = (tokens, options, env) =>
   defaultRender(processTokens(tokens), options, env);
 
-export function WikiCard({ slug, store, onNavigate }) {
-  const [mode, setMode] = useState("loading");
-  const [content, setContent] = useState(undefined);
-  const [height, setHeight] = useState(undefined);
-  const contentRef = useRef(null);
+export function WikiEditor({ slug, document, onSave }) {
+  const {
+    content: { content }
+  } = document;
 
-  if (mode === "loading") {
-    store.getDocument(slug, (error, result) => {
-      if (error) {
-        setMode("error");
-      } else {
-        const { content } = result;
-        setContent(content);
-        setMode("loaded");
-      }
-    });
-  }
-
-  useEffect(() => {
-    const maybeSetHeight = _ => {
-      if (mode === "loaded" && contentRef.current) {
-        const contentElement = contentRef.current;
-        const contentHeight = contentElement.getBoundingClientRect().height;
-        if (contentHeight && contentHeight !== height) {
-          setHeight(contentHeight);
-        }
-      }
-    };
-
-    maybeSetHeight(null);
-    window.addEventListener("resize", maybeSetHeight);
-    return () => {
-      window.removeEventListener("resize", maybeSetHeight);
-    };
-  }, [mode, content]);
-
-  const outerStyle = {
-    // We capture the height in "loaded", but fix the height in editing.
-    // If we accidentally set the height when the mode is "loaded" then rounding
-    // errors cause us to not converge. :P (104 is a magic number where we don't
-    // want the default height, measured by experiment.)
-    height: mode === "editing" ? Math.max(400, height) : undefined,
-
-    // This causes the reported height of the box to match the actual content
-    // height, that is, the box stretches to accomodate the margins of the inner
-    // content. (See "margin collapse".)
-    overflow: "auto"
-  };
-
-  return h(
-    "div",
-    { ref: contentRef, style: outerStyle },
-    h(WikiContents, {
-      slug,
-      mode,
-      content,
-      onNavigate,
-      onEdit: () => setMode("editing"),
-      onSave: newContent => {
-        setMode("saving");
-        store.setDocument(slug, "wiki", newContent, error => {
-          if (error) {
-            setMode("error");
-          } else {
-            setMode("loaded");
-            setContent(newContent);
-          }
-        });
-      },
-      onCancel: () => setMode("loaded")
-    })
-  );
-}
-
-function WikiContents({
-  slug,
-  mode,
-  content,
-  onNavigate,
-  onEdit,
-  onSave,
-  onCancel
-}) {
-  switch (mode) {
-    case "loading":
-      return h("div", null, "Loading...");
-    case "error":
-      return h("div", null, "An error occurred, sorry.");
-    case "loaded":
-      return h(WikiElement, { content, onNavigate, onEdit });
-    case "editing":
-      return h(WikiEditor, {
-        slug,
-        content,
-        onSave,
-        onCancel
-      });
-    case "saving":
-      return h("div", null, "Saving, please wait...");
-  }
-}
-
-function WikiEditor({ slug, content, onSave, onCancel }) {
   const [text, setText] = useState(content || "");
   const [newSlug, setNewSlug] = useState(slug);
 
@@ -228,7 +130,7 @@ function WikiEditor({ slug, content, onSave, onCancel }) {
         display: "grid",
         gridTemplateRows: "1rem auto 2rem",
         gridRowGap: "0.5rem",
-        height: "100%"
+        height: "400px"
       }
     },
     h("input", {
@@ -248,13 +150,23 @@ function WikiEditor({ slug, content, onSave, onCancel }) {
     h(
       "div",
       { style: { gridRow: 3 } },
-      h("button", { type: "button", onClick: () => onSave(text) }, "Save"),
-      h("button", { type: "button", onClick: onCancel }, "Cancel")
+      h(
+        "button",
+        {
+          type: "button",
+          onClick: () => onSave({ contentType: "wiki", content: text })
+        },
+        "Save"
+      )
     )
   );
 }
 
-function WikiElement({ content, onNavigate, onEdit }) {
+export function WikiView({ slug, document, onNavigate }) {
+  const {
+    content: { content }
+  } = document;
+
   const contentElementRef = useRef(null);
   useEffect(() => {
     if (contentElementRef.current) {
@@ -262,7 +174,7 @@ function WikiElement({ content, onNavigate, onEdit }) {
         evt.preventDefault();
         const href = evt.target.href;
         if (href.startsWith(NIB_SCHEME)) {
-          onNavigate(href.substring(NIB_SCHEME.length));
+          onNavigate(href.substring(NIB_SCHEME.length), "view");
         }
       }
 
@@ -287,7 +199,7 @@ function WikiElement({ content, onNavigate, onEdit }) {
       h(
         "a",
         {
-          onClick: onEdit,
+          onClick: () => onNavigate(slug, "edit"),
           style: { cursor: "pointer" }
         },
         h("div", {
