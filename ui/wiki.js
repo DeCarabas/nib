@@ -248,8 +248,8 @@ function WikiEditor({ slug, content, onSave, onCancel }) {
     h(
       "div",
       { style: { gridRow: 3 } },
-      h("button", { onClick: () => onSave(text) }, "Save"),
-      h("button", { onClick: onCancel }, "Cancel")
+      h("button", { type: "button", onClick: () => onSave(text) }, "Save"),
+      h("button", { type: "button", onClick: onCancel }, "Cancel")
     )
   );
 }
