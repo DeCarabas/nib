@@ -1,17 +1,6 @@
-// const fs = require("fs");
-
-// const slugForName = name =>
-//   Buffer.from(name, "utf8")
-//     .toString("base64")
-//     .replace("/", "-")
-//     .replace("+", "_");
-
 export class Storage {
   constructor(path) {
     this.root = path + "/.data";
-    // if (!fs.existsSync(this.root)) {
-    //   fs.mkdirSync(this.root);
-    // }
   }
 
   getDocument(name, callback) {

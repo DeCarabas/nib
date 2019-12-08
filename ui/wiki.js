@@ -1,5 +1,6 @@
 import "https://unpkg.com/feather-icons@4.24.1/dist/feather.js?module";
 import "https://unpkg.com/markdown-it@10.0.0/dist/markdown-it.js";
+import CodeFlask from "https://unpkg.com/codeflask/build/codeflask.module.js?module";
 import { h } from "https://unpkg.com/preact@latest?module";
 import {
   useState,
@@ -155,7 +156,7 @@ export function WikiCard({ slug, store, onNavigate }) {
     // If we accidentally set the height when the mode is "loaded" then rounding
     // errors cause us to not converge. :P (104 is a magic number where we don't
     // want the default height, measured by experiment.)
-    height: mode === "editing" && height >= 104 ? height : undefined,
+    height: mode === "editing" ? Math.max(400, height) : undefined,
 
     // This causes the reported height of the box to match the actual content
     // height, that is, the box stretches to accomodate the margins of the inner
