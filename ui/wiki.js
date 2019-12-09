@@ -128,7 +128,7 @@ export function WikiEditor({ slug, document, onSave }) {
     {
       style: {
         display: "grid",
-        gridTemplateRows: "1rem 1fr 2rem",
+        gridTemplateRows: "2rem 1fr 2rem",
         gridRowGap: "0.5rem",
         height: "400px",
         position: "relative"
@@ -196,7 +196,7 @@ export function WikiView({ slug, document, onNavigate }) {
     }),
     h(
       "div",
-      { className: "absolute top-1 right-1" },
+      { className: "absolute bottom-1 right-1" },
       h(
         "a",
         {

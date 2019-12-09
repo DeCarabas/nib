@@ -1,8 +1,5 @@
+import "https://unpkg.com/feather-icons@4.24.1/dist/feather.js?module";
 import { h, Component, render } from "https://unpkg.com/preact@latest?module";
-import {
-  useEffect,
-  useState
-} from "https://unpkg.com/preact@latest/hooks/dist/hooks.module.js?module";
 import { Storage } from "./storage.js";
 import { WikiView, WikiEditor } from "./wiki.js";
 
@@ -18,6 +15,21 @@ class ContentPage extends Component {
 
   componentDidMount() {
     this.navigate(0, -1, this.props.initialDocument, "view");
+  }
+
+  close(columnIndex, cardIndex) {
+    const newHistory = this.state.history.slice();
+    const column = newHistory[columnIndex];
+    newHistory[columnIndex] = column
+      .slice(0, cardIndex)
+      .concat(column.slice(cardIndex + 1));
+    this.setState({ history: newHistory });
+
+    const { cardIndex: focusCard, columnIndex: focusColumn } = this.state.focus;
+
+    if (cardIndex === focusCard && columnIndex === focusColumn) {
+      this.setState({ focus: { cardIndex: Math.max(0, focusCard - 1) } });
+    }
   }
 
   navigate(columnIndex, cardIndex, target, action) {
@@ -106,7 +118,7 @@ class ContentPage extends Component {
           },
           h(
             CardBox,
-            { key, focused },
+            { key, focused, onClose: () => this.close(columnIndex, cardIndex) },
             h(Card, {
               slug,
               action,
@@ -131,11 +143,33 @@ class ContentPage extends Component {
   }
 }
 
-function CardBox({ focused, children }) {
+function CardBox({ focused, onClose, children }) {
   return h(
     "div",
-    { className: "pa3 ma2 ba w6 relative" + (focused ? "" : " b--light-gray") },
-    children
+    {
+      className: "pa3 ma2 ba w6 relative" + (focused ? "" : " b--light-gray"),
+      style: {
+        display: "grid",
+        gridTemplateRows: "auto 1fr"
+      }
+    },
+    h(
+      "div",
+      { style: { gridRowStart: 1 } },
+      h(
+        "a",
+        {
+          onClick: () => onClose(),
+          style: { cursor: "pointer" }
+        },
+        h("div", {
+          dangerouslySetInnerHTML: {
+            __html: feather.icons["x-circle"].toSvg()
+          }
+        })
+      )
+    ),
+    h("div", { style: { gridRowStart: 2 } }, children)
   );
 }
 
