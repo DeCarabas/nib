@@ -128,9 +128,10 @@ export function WikiEditor({ slug, document, onSave }) {
     {
       style: {
         display: "grid",
-        gridTemplateRows: "1rem auto 2rem",
+        gridTemplateRows: "1rem 1fr 2rem",
         gridRowGap: "0.5rem",
-        height: "400px"
+        height: "400px",
+        position: "relative"
       }
     },
     h("input", {
@@ -140,7 +141,7 @@ export function WikiEditor({ slug, document, onSave }) {
     }),
     h(
       "div",
-      { style: { gridRow: 2 } },
+      { style: { gridRow: 2, backgroundColor: "blue" } },
       h("textarea", {
         className: "w-100 h-100",
         value: text,
