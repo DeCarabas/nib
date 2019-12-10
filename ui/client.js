@@ -27,7 +27,12 @@ class ContentPage extends Component {
 
     const { cardIndex: focusCard, columnIndex: focusColumn } = this.state.focus;
     if (cardIndex === focusCard && columnIndex === focusColumn) {
-      this.setState({ focus: { cardIndex: Math.max(0, focusCard - 1) } });
+      this.setState({
+        focus: {
+          cardIndex: Math.max(0, focusCard - 1),
+          columnIndex: focusColumn
+        }
+      });
     }
   }
 
