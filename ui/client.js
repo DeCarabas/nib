@@ -1,4 +1,5 @@
 import { h, Component, render } from "https://unpkg.com/preact@latest?module";
+import { useRef } from "https://unpkg.com/preact@latest/hooks/dist/hooks.module.js?module";
 import { Storage } from "./storage.js";
 import { WikiView, WikiEditor } from "./wiki.js";
 import { icon } from "./icons.js";
@@ -169,6 +170,8 @@ function CardBox({ focused, onClose, children }) {
 
 const HANDLERS = {
   wiki: {
+    description: "A wiki document",
+    initialContent: "*There's nothing here yet!*",
     view: WikiView,
     edit: WikiEditor
   }
@@ -185,6 +188,11 @@ function Card({ slug, action, document, onNavigate, onSave }) {
       return h(ErrorContent, { message: "An Error Has Occurred: " + content });
 
     case "loaded": {
+      const handlerProps = { slug, document, onNavigate, onSave };
+      if (content.contentType === undefined) {
+        return h(MissingDocumentHandler, handlerProps);
+      }
+
       const typeHandlers = HANDLERS[content.contentType];
       if (!typeHandlers) {
         return h(ErrorContent, {
@@ -197,7 +205,7 @@ function Card({ slug, action, document, onNavigate, onSave }) {
             message: `I don't know how to ${action} a ${content.contentType} :(`
           });
         } else {
-          return h(handler, { slug, document, onNavigate, onSave });
+          return h(handler, handlerProps);
         }
       }
     }
@@ -209,6 +217,39 @@ function Card({ slug, action, document, onNavigate, onSave }) {
 
 function ErrorContent({ message }) {
   return h("i", null, message);
+}
+
+function MissingDocumentHandler({ slug, document, onNavigate, onSave }) {
+  const contentTypeRef = useRef(null);
+  return h(
+    "div",
+    null,
+    h("h1", { className: "f3 lh-title" }, slug),
+    h("p", null, "There is nothing here yet. What kind of thing should it be?"),
+    h(
+      "div",
+      null,
+      h(
+        "select",
+        { className: "w5", ref: contentTypeRef },
+        Object.keys(HANDLERS).map(key =>
+          h("option", { value: key, key }, HANDLERS[key].description)
+        )
+      ),
+      h(
+        "span",
+        {
+          className: "dib tc ba ma1 pa1 w4 pointer",
+          onClick: _ => {
+            const contentType = contentTypeRef.current.value;
+            const content = HANDLERS[contentType].initialContent;
+            onSave({ contentType, content });
+          }
+        },
+        "Create It!"
+      )
+    )
+  );
 }
 
 const store = new Storage("."); // TODO This sucks

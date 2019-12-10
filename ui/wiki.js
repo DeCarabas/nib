@@ -184,7 +184,7 @@ export function WikiView({ slug, document, onNavigate }) {
 
   return h(
     "div",
-    { className: "sans-serif" },
+    null,
     h(MarkdownView, {
       markdown: content || "*Nothing here yet!*",
       ref: contentElementRef
