@@ -19,9 +19,20 @@
 .gr2 {
   grid-row-start: 2;
 }
+.gr3 {
+  grid-row-start: 3;
+}
 
 /* Special Stuff */
 .card-box-container {
   display: grid;
   grid-template-columns: auto 1fr;
+}
+
+.wiki-editor-container {
+  display: grid;
+  grid-template-rows: 2rem 1fr 2rem;
+  row-gap: 0.5rem;
+  height: 400px;
+  position: relative;
 }

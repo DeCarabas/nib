@@ -1,4 +1,3 @@
-import "https://unpkg.com/feather-icons@4.24.1/dist/feather.js?module";
 import "https://unpkg.com/markdown-it@10.0.0/dist/markdown-it.js";
 import CodeFlask from "https://unpkg.com/codeflask/build/codeflask.module.js?module";
 import { h } from "https://unpkg.com/preact@latest?module";
@@ -7,6 +6,7 @@ import {
   useEffect,
   useRef
 } from "https://unpkg.com/preact@latest/hooks/dist/hooks.module.js?module";
+import { icon } from "./icons.js";
 
 const md = window.markdownit();
 
@@ -125,23 +125,15 @@ export function WikiEditor({ slug, document, onSave }) {
 
   return h(
     "div",
-    {
-      style: {
-        display: "grid",
-        gridTemplateRows: "2rem 1fr 2rem",
-        gridRowGap: "0.5rem",
-        height: "400px",
-        position: "relative"
-      }
-    },
+    { className: "wiki-editor-container" },
     h("input", {
-      style: { gridRow: 1 },
+      className: "gr1",
       value: newSlug,
       onChange: e => setNewSlug(e.target.value)
     }),
     h(
       "div",
-      { style: { gridRow: 2, backgroundColor: "blue" } },
+      { className: "gr2" },
       h("textarea", {
         className: "w-100 h-100",
         value: text,
@@ -150,7 +142,7 @@ export function WikiEditor({ slug, document, onSave }) {
     ),
     h(
       "div",
-      { style: { gridRow: 3 } },
+      { className: "gr3" },
       h(
         "button",
         {
@@ -161,6 +153,10 @@ export function WikiEditor({ slug, document, onSave }) {
       )
     )
   );
+}
+
+function MarkdownView({ markdown }) {
+  return h("div", { dangerouslySetInnerHTML: { __html: md.render(markdown) } });
 }
 
 export function WikiView({ slug, document, onNavigate }) {
@@ -179,7 +175,8 @@ export function WikiView({ slug, document, onNavigate }) {
         }
       }
 
-      for (let link of contentElementRef.current.getElementsByTagName("a")) {
+      const elem = contentElementRef.current.base;
+      for (let link of elem.getElementsByTagName("a")) {
         link.onclick = onClick;
       }
     }
@@ -188,10 +185,8 @@ export function WikiView({ slug, document, onNavigate }) {
   return h(
     "div",
     { className: "sans-serif" },
-    h("div", {
-      dangerouslySetInnerHTML: {
-        __html: md.render(content || "*Nothing here yet!*")
-      },
+    h(MarkdownView, {
+      markdown: content || "*Nothing here yet!*",
       ref: contentElementRef
     }),
     h(
@@ -200,14 +195,10 @@ export function WikiView({ slug, document, onNavigate }) {
       h(
         "a",
         {
-          onClick: () => onNavigate(slug, "edit"),
-          style: { cursor: "pointer" }
+          className: "pointer",
+          onClick: () => onNavigate(slug, "edit")
         },
-        h("div", {
-          dangerouslySetInnerHTML: {
-            __html: feather.icons["edit"].toSvg()
-          }
-        })
+        h(icon, { name: "edit" })
       )
     )
   );
