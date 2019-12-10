@@ -1,7 +1,7 @@
-import "https://unpkg.com/feather-icons@4.24.1/dist/feather.js?module";
 import { h, Component, render } from "https://unpkg.com/preact@latest?module";
 import { Storage } from "./storage.js";
 import { WikiView, WikiEditor } from "./wiki.js";
+import { icon } from "./icons.js";
 
 class ContentPage extends Component {
   constructor(props) {
@@ -26,7 +26,6 @@ class ContentPage extends Component {
     this.setState({ history: newHistory });
 
     const { cardIndex: focusCard, columnIndex: focusColumn } = this.state.focus;
-
     if (cardIndex === focusCard && columnIndex === focusColumn) {
       this.setState({ focus: { cardIndex: Math.max(0, focusCard - 1) } });
     }
@@ -146,30 +145,20 @@ class ContentPage extends Component {
 function CardBox({ focused, onClose, children }) {
   return h(
     "div",
-    {
-      className: "pa3 ma2 ba w6 relative" + (focused ? "" : " b--light-gray"),
-      style: {
-        display: "grid",
-        gridTemplateRows: "auto 1fr"
-      }
-    },
+    { className: "card-box-container hide-child" },
     h(
       "div",
-      { style: { gridRowStart: 1 } },
-      h(
-        "a",
-        {
-          onClick: () => onClose(),
-          style: { cursor: "pointer" }
-        },
-        h("div", {
-          dangerouslySetInnerHTML: {
-            __html: feather.icons["x-circle"].toSvg()
-          }
-        })
-      )
+      { className: "gc1 pt3 pl1 child pointer", onClick: _ => onClose() },
+      h(icon, { name: "x-square" })
     ),
-    h("div", { style: { gridRowStart: 2 } }, children)
+    h(
+      "div",
+      {
+        className:
+          "gc2 pa3 ma2 ba w6 relative" + (focused ? "" : " b--light-gray")
+      },
+      children
+    )
   );
 }
 

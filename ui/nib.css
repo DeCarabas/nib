@@ -2,3 +2,26 @@
 .w6 {
   width: 32rem;
 }
+
+/* Grids. */
+.dg {
+  display: grid;
+}
+.gc1 {
+  grid-column-start: 1;
+}
+.gc2 {
+  grid-column-start: 2;
+}
+.gr1 {
+  grid-row-start: 1;
+}
+.gr2 {
+  grid-row-start: 2;
+}
+
+/* Special Stuff */
+.card-box-container {
+  display: grid;
+  grid-template-columns: auto 1fr;
+}
