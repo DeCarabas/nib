@@ -114,6 +114,51 @@ const defaultRender = md.renderer.render.bind(md.renderer);
 md.renderer.render = (tokens, options, env) =>
   defaultRender(processTokens(tokens), options, env);
 
+function CodeMirrorEditor({ value, onChange }) {
+  const ref = useRef(null);
+  const codeMirror = useRef({ value });
+
+  // Make sure our codeMirror is bound to the appropriate element.
+  useEffect(() => {
+    const { elt } = codeMirror.current;
+    if (ref.current !== elt) {
+      if (ref.current) {
+        const cm = CodeMirror(ref.current, {
+          value: value,
+          lineWrapping: true
+        });
+        cm.on("changes", (_, changes) => {
+          if (codeMirror.current.cm === cm) {
+            const newValue = cm.getValue();
+            codeMirror.current.value = newValue;
+            if (changes.some(c => c.origin[0] === "+")) {
+              onChange(newValue);
+            }
+          }
+        });
+        codeMirror.current = { elt: ref.current, cm, value };
+      } else {
+        codeMirror.current = { value };
+      }
+    }
+  });
+
+  // Keep our codeMirror up to date with the incoming value; if the incoming
+  // value changes then we need to replace the text.
+  useEffect(() => {
+    const { cm, value: lastValue } = codeMirror.current;
+    if (cm && lastValue != value) {
+      const cursor = cm.getCursor();
+      cm.setValue(value);
+      cm.setCursor(cursor);
+
+      codeMirror.current.value = value;
+    }
+  });
+
+  return h("div", { ref });
+}
+
 export function WikiEditor({ slug, document, onSave }) {
   const {
     content: { content }
@@ -133,10 +178,9 @@ export function WikiEditor({ slug, document, onSave }) {
     h(
       "div",
       { className: "gr2" },
-      h("textarea", {
-        className: "w-100 h-100",
+      h(CodeMirrorEditor, {
         value: text,
-        onChange: e => setText(e.target.value)
+        onChange: e => setText(e)
       })
     ),
     h(
