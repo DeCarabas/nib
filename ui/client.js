@@ -12,6 +12,7 @@ class ContentPage extends Component {
       focus: { columnIndex: 0, cardIndex: 0 },
       documents: {}
     };
+    this.nextKey = 0;
   }
 
   componentDidMount() {
@@ -38,12 +39,17 @@ class ContentPage extends Component {
   }
 
   navigate(columnIndex, cardIndex, target, action) {
+    // console.log("Navigate:", columnIndex, cardIndex, target, action);
     const newHistory = this.state.history.slice();
     const column = newHistory[columnIndex];
     // TODO: Don't insert if the target is already in the column.
     newHistory[columnIndex] = column
       .slice(0, cardIndex + 1)
-      .concat([{ slug: target, action }], column.slice(cardIndex + 1));
+      .concat(
+        [{ slug: target, action, key: this.nextKey }],
+        column.slice(cardIndex + 1)
+      );
+    this.nextKey += 1;
 
     this.setState({
       history: newHistory,
@@ -94,7 +100,7 @@ class ContentPage extends Component {
     const { columnIndex: focusColumn, cardIndex: focusCard } = this.state.focus;
     const columns = this.state.history.map(_ => "auto").join(" ");
     const cards = this.state.history.map((column, columnIndex) =>
-      column.map(({ slug, action }, cardIndex) => {
+      column.map(({ slug, action, key }, cardIndex) => {
         // If this is the focused card then when we get the ref we scroll to
         // the correct position.
         const focused = columnIndex === focusColumn && cardIndex == focusCard;
@@ -112,27 +118,19 @@ class ContentPage extends Component {
               }
             }
           : null;
-        const key = columnIndex.toString() + ":" + cardIndex.toString();
-        const document = this.state.documents[slug];
         return h(
           "div",
-          {
-            key,
-            ref,
-            style: { gridColumnStart: columnIndex + 1 }
-          },
-          h(
-            CardBox,
-            { key, focused, onClose: () => this.close(columnIndex, cardIndex) },
-            h(Card, {
-              slug,
-              action,
-              document,
-              onNavigate: (target, action) =>
-                this.navigate(columnIndex, cardIndex, target, action),
-              onSave: newContent => this.save(slug, newContent)
-            })
-          )
+          { key, ref, style: { gridColumnStart: columnIndex + 1 } },
+          h(Card, {
+            focused,
+            slug,
+            action,
+            document: this.state.documents[slug],
+            onClose: () => this.close(columnIndex, cardIndex),
+            onNavigate: (target, action) =>
+              this.navigate(columnIndex, cardIndex, target, action),
+            onSave: newContent => this.save(slug, newContent)
+          })
         );
       })
     );
@@ -148,14 +146,66 @@ class ContentPage extends Component {
   }
 }
 
-function CardBox({ focused, onClose, children }) {
+const HANDLERS = {
+  wiki: {
+    description: "A wiki document",
+    initialContent: "*There's nothing here yet!*",
+    view: WikiView,
+    edit: WikiEditor
+  }
+};
+
+function canEdit(document) {
+  return (
+    document &&
+    document.content &&
+    HANDLERS[document.content.contentType] &&
+    HANDLERS[document.content.contentType]["edit"]
+  );
+}
+
+function Card({
+  focused,
+  slug,
+  action,
+  document,
+  onClose,
+  onNavigate,
+  onSave
+}) {
+  return h(
+    CardBox,
+    {
+      focused,
+      onClose,
+      onEdit:
+        action !== "edit" && canEdit(document)
+          ? () => onNavigate(slug, "edit")
+          : null
+    },
+    h(CardContent, { slug, action, document, onNavigate, onSave })
+  );
+}
+
+function CardBox({ focused, onClose, onEdit, children }) {
   return h(
     "div",
     { className: "card-box-container hide-child" },
     h(
       "div",
-      { className: "gc1 pt3 pl1 child pointer", onClick: _ => onClose() },
-      h(icon, { name: "x-square" })
+      { className: "gc1 pt3 pl1 child pointer" },
+      h(
+        "div",
+        { className: "pointer", onClick: _ => onClose() },
+        h(icon, { name: "x-square" })
+      ),
+      onEdit
+        ? h(
+            "div",
+            { className: "pointer", onClick: _ => onEdit() },
+            h(icon, { name: "edit" })
+          )
+        : null
     ),
     h(
       "div",
@@ -168,16 +218,7 @@ function CardBox({ focused, onClose, children }) {
   );
 }
 
-const HANDLERS = {
-  wiki: {
-    description: "A wiki document",
-    initialContent: "*There's nothing here yet!*",
-    view: WikiView,
-    edit: WikiEditor
-  }
-};
-
-function Card({ slug, action, document, onNavigate, onSave }) {
+function CardContent({ slug, action, document, onNavigate, onSave }) {
   const { state, content } = document;
 
   switch (state) {

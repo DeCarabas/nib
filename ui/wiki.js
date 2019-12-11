@@ -5,7 +5,6 @@ import {
   useEffect,
   useRef
 } from "https://unpkg.com/preact@latest/hooks/dist/hooks.module.js?module";
-import { icon } from "./icons.js";
 
 const md = window.markdownit();
 
@@ -231,18 +230,6 @@ export function WikiView({ slug, document, onNavigate }) {
     h(MarkdownView, {
       markdown: content || "*Nothing here yet!*",
       ref: contentElementRef
-    }),
-    h(
-      "div",
-      { className: "absolute bottom-1 right-1" },
-      h(
-        "a",
-        {
-          className: "pointer",
-          onClick: () => onNavigate(slug, "edit")
-        },
-        h(icon, { name: "edit" })
-      )
-    )
+    })
   );
 }
