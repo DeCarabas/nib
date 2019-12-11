@@ -124,7 +124,8 @@ function CodeMirrorEditor({ value, onChange }) {
       if (ref.current) {
         const cm = CodeMirror(ref.current, {
           value: value,
-          lineWrapping: true
+          lineWrapping: true,
+          mode: "markdown"
         });
         cm.on("changes", (_, changes) => {
           if (codeMirror.current.cm === cm) {
