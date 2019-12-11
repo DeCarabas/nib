@@ -1,5 +1,4 @@
 import "https://unpkg.com/markdown-it@10.0.0/dist/markdown-it.js";
-import CodeFlask from "https://unpkg.com/codeflask/build/codeflask.module.js?module";
 import { h } from "https://unpkg.com/preact@latest?module";
 import {
   useState,
