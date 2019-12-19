@@ -10,8 +10,13 @@
     "start": "node ."
   },
   "dependencies": {
+    "@types/codemirror": "0.0.81",
+    "@types/feather-icons": "^4.7.0",
+    "@types/markdown-it": "0.0.9",
     "express": "^4.17.1",
-    "sqlite": "^3.0.3"
+    "sqlite": "^3.0.3",
+    "typescript": "^3.7.3",
+    "@types/marked": "^0.7.2"
   },
   "engines": {
     "node": "12.x"

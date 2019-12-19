@@ -4,10 +4,10 @@
     <title>Nib</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <!-- :( -->
-    <script src="codemirror/codemirror.js"></script>
-    <link rel="stylesheet" href="codemirror/codemirror.css" />
-    <script src="codemirror/markdown.js"></script>
+    <!-- Not ecma-importable, so. -->
+    <!-- <script src="extern/codemirror.5.49.2/codemirror.js"></script>
+    <script src="extern/codemirror.5.49.2/markdown.js"></script> -->
+    <link rel="stylesheet" href="extern/codemirror.5.49.2/lib/codemirror.css" />
 
     <!-- TODO Switch to packaged tachyons or something? -->
     <link
@@ -18,6 +18,7 @@
   </head>
   <body>
     <div id="root" class="sans-serif" />
-    <script type="module" src="/client.js"></script>
+    <script src="loader.js"></script>
+    <script src="client.js"></script>
   </body>
 </html>

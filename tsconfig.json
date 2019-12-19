@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "allowSyntheticDefaultImports": true,
+    "noImplicitAny": true,
+    "target": "ES6",
+    "module": "umd",
+    "moduleResolution": "node"
+  },
+  "include": ["./ui/*.ts"]
+}

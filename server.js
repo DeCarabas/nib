@@ -1,7 +1,9 @@
 const express = require("express");
 const sqlite = require("sqlite3").verbose();
+const tshook = require("./tshook.js");
 
 const app = express();
+app.use(tshook.watch("."));
 app.use(express.static("ui"));
 app.use(express.json());
 
