@@ -32,7 +32,7 @@ function resolveUrl(url: string, base: string): string {
   return resolved_url + ".js";
 }
 
-type ModuleLoadCallback = (error: Error, module: any) => void;
+type ModuleLoadCallback = (module: any) => void;
 
 interface LoadingCachedModule {
   state: "loading";
@@ -42,23 +42,29 @@ interface LoadingCachedModule {
 interface LoadedCachedModule {
   state: "loaded";
   value: any;
-  error: Error;
 }
 
 const loadedModuleCache: {
   [url: string]: LoadingCachedModule | LoadedCachedModule;
 } = {};
 
+/**
+ * Load the specified module. Ensures that each module is loaded exactly once.
+ *
+ * @param base The base URL, for resolving relative URLs.
+ * @param url The URL of the module to load; which may be relative.
+ * @param callback The callback to call when the module has been loaded.
+ */
 function loadModule(
-  onBehalfOf: string,
+  base: string,
   url: string,
-  callback: (err: Error, value: any) => void
+  callback: ModuleLoadCallback
 ): void {
-  const absoluteUrl = resolveUrl(url, onBehalfOf);
+  const absoluteUrl = resolveUrl(url, base);
   let mod = loadedModuleCache[absoluteUrl];
   if (mod) {
     if (mod.state === "loaded") {
-      callback(mod.error, mod.value);
+      callback(mod.value);
     } else {
       mod.callbacks.push(callback);
     }
@@ -74,8 +80,19 @@ function loadModule(
   }
 }
 
+/**
+ * The AMD module definition function; the heart of the entire loader.
+ *
+ * @param requirements
+ * Dependencies to load, before running the specified factory. If you have no
+ * dependencies you can just put the factory here.
+ *
+ * @param factory
+ * The function to call to define the module. Either return a value from here,
+ * or depend on `exports` and set values on the exports object.
+ */
 function define(requirements: string[] | Factory, factory?: Factory) {
-  // TODO: Technically AMD lets me put a name as the first arg but I'll get
+  // NOTE: Technically AMD lets me put a name as the first arg but I'll get
   //       there when I get there.
   if (typeof requirements === "function") {
     factory = requirements;
@@ -109,9 +126,9 @@ function define(requirements: string[] | Factory, factory?: Factory) {
     console.log(`${name}: Loaded!`);
 
     let entry = loadedModuleCache[name];
-    loadedModuleCache[name] = { state: "loaded", error: null, value: result };
+    loadedModuleCache[name] = { state: "loaded", value: result };
     if (entry && entry.state === "loading") {
-      entry.callbacks.forEach(callback => callback(null, result));
+      entry.callbacks.forEach(callback => callback(result));
     }
   }
 
@@ -125,14 +142,12 @@ function define(requirements: string[] | Factory, factory?: Factory) {
     } else {
       pending += 1;
       window.setTimeout(() => {
-        loadModule(name, requirement, (err, value) => {
-          if (!err) {
-            console.log(`${name}: Loaded dependency ${requirement}`);
-            args[index] = byName[requirement] = value;
-            pending -= 1;
-            if (pending === 0) {
-              finish();
-            }
+        loadModule(name, requirement, value => {
+          console.log(`${name}: Loaded dependency ${requirement}`);
+          args[index] = byName[requirement] = value;
+          pending -= 1;
+          if (pending === 0) {
+            finish();
           }
         });
       }, 0);

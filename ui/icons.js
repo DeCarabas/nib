@@ -15,3 +15,4 @@
     }
     exports.icon = icon;
 });
+//# sourceMappingURL=icons.js.map

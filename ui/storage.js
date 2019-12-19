@@ -41,3 +41,4 @@
     }
     exports.Storage = Storage;
 });
+//# sourceMappingURL=storage.js.map

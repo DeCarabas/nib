@@ -2,6 +2,7 @@
   "compilerOptions": {
     "allowSyntheticDefaultImports": true,
     "noImplicitAny": true,
+    "sourceMap": true,
     "target": "ES6",
     "module": "umd",
     "moduleResolution": "node"

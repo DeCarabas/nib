@@ -208,3 +208,4 @@
     const store = new storage_1.Storage("."); // TODO This sucks
     preact_1.render(preact_1.h(ContentPage, { initialDocument: "index", store }), document.getElementById("root"));
 });
+//# sourceMappingURL=client.js.map
