@@ -19,44 +19,81 @@
             super(props);
             this.state = {
                 history: [[]],
-                focus: { columnIndex: 0, cardIndex: 0 },
+                focus: [],
                 documents: {}
             };
             this.nextKey = 0;
         }
         componentDidMount() {
-            this.navigate(0, -1, this.props.initialDocument, "view");
+            this.navigate(0, -1, this.props.initialDocument, "view", "below");
         }
         close(columnIndex, cardIndex) {
+            var _a;
+            const victim = (this.state.history[columnIndex] || [])[cardIndex];
             const newHistory = this.state.history.slice();
             const column = newHistory[columnIndex];
+            const cardHeight = ((_a = victim) === null || _a === void 0 ? void 0 : _a.height) || 0;
             newHistory[columnIndex] = column
                 .slice(0, cardIndex)
-                .concat(column.slice(cardIndex + 1));
-            this.setState({ history: newHistory });
-            const { cardIndex: focusCard, columnIndex: focusColumn } = this.state.focus;
-            if (cardIndex === focusCard && columnIndex === focusColumn) {
-                this.setState({
-                    focus: {
-                        cardIndex: Math.max(0, focusCard - 1),
-                        columnIndex: focusColumn
-                    }
-                });
-            }
-        }
-        navigate(columnIndex, cardIndex, target, action) {
-            // console.log("Navigate:", columnIndex, cardIndex, target, action);
-            const newHistory = this.state.history.slice();
-            const column = newHistory[columnIndex];
-            // TODO: Don't insert if the target is already in the column.
-            newHistory[columnIndex] = column
-                .slice(0, cardIndex + 1)
-                .concat([{ slug: target, action, key: this.nextKey }], column.slice(cardIndex + 1));
-            this.nextKey += 1;
+                .concat(column
+                .slice(cardIndex + 1)
+                .map(c => Object.assign({}, c, { start: c.start - cardHeight })));
             this.setState({
                 history: newHistory,
-                focus: { columnIndex, cardIndex: cardIndex + 1 }
+                focus: this.state.focus.filter(key => { var _a; return key !== ((_a = victim) === null || _a === void 0 ? void 0 : _a.key); })
             });
+        }
+        navigate(columnIndex, cardIndex, target, action, position) {
+            const height = 4;
+            // console.log("Navigate:", columnIndex, cardIndex, target, action);
+            const history = this.state.history;
+            const targetCard = (history[columnIndex] || [])[cardIndex];
+            if (position == "below") {
+                const column = history[columnIndex] || [];
+                const start = targetCard ? targetCard.start + targetCard.height : 0;
+                const nc = { slug: target, action, key: this.nextKey, start, height };
+                const newColumn = [
+                    ...column.slice(0, cardIndex + 1),
+                    nc,
+                    ...column
+                        .slice(cardIndex + 1)
+                        .map(c => Object.assign({}, c, { start: c.start + height }))
+                ];
+                this.nextKey += 1;
+                const newHistory = [
+                    ...history.slice(0, Math.max(columnIndex - 1, 0)),
+                    newColumn,
+                    ...history.slice(columnIndex + 1)
+                ];
+                this.setState({
+                    history: newHistory,
+                    focus: [...this.state.focus, nc.key]
+                });
+            }
+            else if (position == "right") {
+                const column = history[columnIndex + 1] || [];
+                const start = targetCard ? targetCard.start : 0;
+                const index = column.findIndex(c => c.start >= start);
+                const targetIndex = index >= 0 ? index : column.length;
+                const nc = { slug: target, action, key: this.nextKey, start, height };
+                const newColumn = [
+                    ...column.slice(0, targetIndex),
+                    nc,
+                    ...column
+                        .slice(targetIndex)
+                        .map(c => Object.assign({}, c, { start: c.start + height }))
+                ];
+                this.nextKey += 1;
+                const newHistory = [
+                    ...history.slice(0, columnIndex + 1),
+                    newColumn,
+                    ...history.slice(columnIndex + 2)
+                ];
+                this.setState({
+                    history: newHistory,
+                    focus: [...this.state.focus, nc.key]
+                });
+            }
             this.load(target);
         }
         load(slug) {
@@ -91,36 +128,36 @@
             });
         }
         render() {
-            const { columnIndex: focusColumn, cardIndex: focusCard } = this.state.focus;
-            const columns = this.state.history.map(_ => "auto").join(" ");
-            const cards = this.state.history.map((column, columnIndex) => column.map(({ slug, action, key }, cardIndex) => {
+            const cards = this.state.history.map((column, columnIndex) => column.map(({ slug, action, key, start, height }, cardIndex) => {
                 // If this is the focused card then when we get the ref we scroll to
                 // the correct position.
-                const focused = columnIndex === focusColumn && cardIndex == focusCard;
+                const focused = key == this.state.focus[this.state.focus.length - 1];
                 const ref = focused
-                    ? (el) => {
-                        if (el) {
-                            const rect = el.getBoundingClientRect();
-                            window.requestAnimationFrame(() => window.scrollTo({
-                                top: Math.max(0, rect.top - 10),
-                                left: Math.max(0, rect.left - 10),
-                                behavior: "smooth"
-                            }));
-                        }
-                    }
+                    ? (el) => { var _a; return (_a = el) === null || _a === void 0 ? void 0 : _a.scrollIntoView({ behavior: "smooth" }); }
                     : null;
-                return preact_1.h("div", { key, ref, style: { gridColumnStart: columnIndex + 1 } }, preact_1.h(Card, {
+                return preact_1.h("div", {
+                    key,
+                    ref,
+                    style: {
+                        gridColumnStart: columnIndex + 1,
+                        gridRow: `${start + 1} / span ${height}`
+                    }
+                }, preact_1.h(Card, {
                     focused,
                     slug,
                     action,
                     document: this.state.documents[slug],
                     onClose: () => this.close(columnIndex, cardIndex),
-                    onNavigate: (target, action) => this.navigate(columnIndex, cardIndex, target, action),
+                    onNavigate: (target, action, position) => this.navigate(columnIndex, cardIndex, target, action, position),
                     onSave: (newContent) => this.save(slug, newContent)
                 }));
             }));
             return preact_1.h("div", {
-                style: { display: "grid", gridTemplateColumns: columns },
+                style: {
+                    display: "grid",
+                    gridAutoColumns: "auto",
+                    gridAutoRows: "8rem"
+                },
                 overflow: "scroll"
             }, cards);
         }
@@ -146,12 +183,12 @@
             focused,
             onClose,
             onEdit: action !== "edit" && canEdit(document)
-                ? () => onNavigate(slug, "edit")
+                ? () => onNavigate(slug, "edit", "right")
                 : null
         }, preact_1.h(CardContent, { slug, action, document, onNavigate, onSave }));
     }
     function CardBox({ focused, onClose, onEdit, children }) {
-        return preact_1.h("div", { className: "card-box-container hide-child" }, preact_1.h("div", { className: "gc1 pt3 pl1 child pointer" }, preact_1.h("div", { className: "pointer", onClick: () => onClose() }, preact_1.h(icons_1.icon, { name: "x-square" })), onEdit
+        return preact_1.h("div", { className: "card-box-container hide-child h-100" }, preact_1.h("div", { className: "gc1 pt3 pl1 child pointer" }, preact_1.h("div", { className: "pointer", onClick: () => onClose() }, preact_1.h(icons_1.icon, { name: "x-square" })), onEdit
             ? preact_1.h("div", { className: "pointer", onClick: () => onEdit() }, preact_1.h(icons_1.icon, { name: "edit" }))
             : null), preact_1.h("div", {
             className: "gc2 pa3 ma2 ba w6 relative" + (focused ? "" : " b--light-gray")

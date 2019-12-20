@@ -5,6 +5,7 @@ import * as CodeMirror from "./extern/codemirror.5.49.2/lib/codemirror";
 import "./extern/codemirror.5.49.2/mode/markdown/markdown";
 import StateInline = require("./extern/markdown-it.10.0.0/lib/rules_inline/state_inline");
 import Token = require("./extern/markdown-it.10.0.0/lib/token");
+import { HandlerProps } from "./types";
 
 const NIB_SCHEME = "nib://";
 
@@ -170,25 +171,7 @@ function CodeMirrorEditor({ value, onChange }: CodeMirrorEditorProps) {
   return h("div", { ref });
 }
 
-export interface NibDocumentContent {
-  content: string;
-  contentType: string;
-}
-
-type NibDocumentState = "loading" | "error" | "loaded";
-
-export interface NibDocument {
-  state: NibDocumentState;
-  content: NibDocumentContent;
-}
-
-interface WikiEditorProps {
-  slug: string;
-  document: NibDocument;
-  onSave: (newDocument: NibDocumentContent) => void;
-}
-
-export function WikiEditor({ slug, document, onSave }: WikiEditorProps) {
+export function WikiEditor({ slug, document, onSave }: HandlerProps) {
   const {
     content: { content }
   } = document;
@@ -236,13 +219,7 @@ function MarkdownView({ markdown }: MarkdownViewProperties) {
   return h("div", { dangerouslySetInnerHTML: { __html: html } });
 }
 
-interface WikiViewProperties {
-  slug: string;
-  document: NibDocument;
-  onNavigate: (slug: string, action: string) => void;
-}
-
-export function WikiView({ slug, document, onNavigate }: WikiViewProperties) {
+export function WikiView({ slug, document, onNavigate }: HandlerProps) {
   const {
     content: { content }
   } = document;
@@ -254,7 +231,7 @@ export function WikiView({ slug, document, onNavigate }: WikiViewProperties) {
         evt.preventDefault();
         const href = evt.target.href;
         if (href.startsWith(NIB_SCHEME)) {
-          onNavigate(href.substring(NIB_SCHEME.length), "view");
+          onNavigate(href.substring(NIB_SCHEME.length), "view", "below");
         }
       };
 

@@ -181,7 +181,7 @@
                     evt.preventDefault();
                     const href = evt.target.href;
                     if (href.startsWith(NIB_SCHEME)) {
-                        onNavigate(href.substring(NIB_SCHEME.length), "view");
+                        onNavigate(href.substring(NIB_SCHEME.length), "view", "below");
                     }
                 };
                 const elem = contentElementRef.current.base;
