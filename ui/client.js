@@ -4,16 +4,16 @@
         if (v !== undefined) module.exports = v;
     }
     else if (typeof define === "function" && define.amd) {
-        define(["require", "exports", "./extern/preact.10.1.1/preact", "./extern/preact.10.1.1/hooks", "./storage", "./wiki", "./icons"], factory);
+        define(["require", "exports", "./extern/preact.10.1.1/preact", "./extern/preact.10.1.1/hooks", "./wiki", "./icons", "./layout"], factory);
     }
 })(function (require, exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     const preact_1 = require("./extern/preact.10.1.1/preact");
     const hooks_1 = require("./extern/preact.10.1.1/hooks");
-    const storage_1 = require("./storage");
     const wiki_1 = require("./wiki");
     const icons_1 = require("./icons");
+    const layout_1 = require("./layout");
     class ContentPage extends preact_1.Component {
         constructor(props) {
             super(props);
@@ -135,14 +135,7 @@
                 const ref = focused
                     ? (el) => { var _a; return (_a = el) === null || _a === void 0 ? void 0 : _a.scrollIntoView({ behavior: "smooth" }); }
                     : null;
-                return preact_1.h("div", {
-                    key,
-                    ref,
-                    style: {
-                        gridColumnStart: columnIndex + 1,
-                        gridRow: `${start + 1} / span ${height}`
-                    }
-                }, preact_1.h(Card, {
+                return preact_1.h("div", { key, ref, style: { gridColumnStart: columnIndex + 1 } }, preact_1.h(Card, {
                     focused,
                     slug,
                     action,
@@ -156,7 +149,7 @@
                 style: {
                     display: "grid",
                     gridAutoColumns: "auto",
-                    gridAutoRows: "8rem"
+                    gridAutoRows: "minmax(2rem, auto)"
                 },
                 overflow: "scroll"
             }, cards);
@@ -242,7 +235,11 @@
             }
         }, "Create It!")));
     }
-    const store = new storage_1.Storage("."); // TODO This sucks
-    preact_1.render(preact_1.h(ContentPage, { initialDocument: "index", store }), document.getElementById("root"));
+    // const store = new Storage("."); // TODO This sucks
+    // render(
+    //   h(ContentPage, { initialDocument: "index", store }),
+    //   document.getElementById("root")
+    // );
+    preact_1.render(preact_1.h("div", { style: { position: "relative", height: "100%" } }, preact_1.h(layout_1.DraggableCard, { title: "what", initialLeft: 0, initialTop: 0 }, preact_1.h("div", null, "WHAT UP")), preact_1.h(layout_1.DraggableCard, { title: "this", initialLeft: 100, initialTop: 100 }, preact_1.h("div", null, "DOG"))), document.getElementById("root"));
 });
 //# sourceMappingURL=client.js.map

@@ -19,6 +19,7 @@ import {
   NibDocumentContent,
   HandlerProps
 } from "./types";
+import { DraggableCard } from "./layout";
 
 interface ContentPageProps {
   initialDocument: string;
@@ -190,14 +191,7 @@ class ContentPage extends Component<ContentPageProps, ContentPageState> {
           : null;
         return h(
           "div",
-          {
-            key,
-            ref,
-            style: {
-              gridColumnStart: columnIndex + 1,
-              gridRow: `${start + 1} / span ${height}`
-            }
-          },
+          { key, ref, style: { gridColumnStart: columnIndex + 1 } },
           h(Card, {
             focused,
             slug,
@@ -223,7 +217,7 @@ class ContentPage extends Component<ContentPageProps, ContentPageState> {
         style: {
           display: "grid",
           gridAutoColumns: "auto",
-          gridAutoRows: "8rem"
+          gridAutoRows: "minmax(2rem, auto)"
         },
         overflow: "scroll"
       },
@@ -424,8 +418,26 @@ function MissingDocumentHandler({ slug, onSave }: HandlerProps) {
   );
 }
 
-const store = new Storage("."); // TODO This sucks
+// const store = new Storage("."); // TODO This sucks
+// render(
+//   h(ContentPage, { initialDocument: "index", store }),
+//   document.getElementById("root")
+// );
+
 render(
-  h(ContentPage, { initialDocument: "index", store }),
+  h(
+    "div",
+    { style: { position: "relative", height: "100%" } },
+    h(
+      DraggableCard,
+      { title: "what", initialLeft: 0, initialTop: 0 },
+      h("div", null, "WHAT UP")
+    ),
+    h(
+      DraggableCard,
+      { title: "this", initialLeft: 100, initialTop: 100 },
+      h("div", null, "DOG")
+    )
+  ),
   document.getElementById("root")
 );

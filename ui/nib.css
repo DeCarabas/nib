@@ -35,6 +35,24 @@
 }
 
 /* Special Stuff */
+.drag-card {
+  width: 32rem;
+  border-width: 2px;
+}
+
+.drag-title {
+  width: 100%;
+  min-height: 2rem;
+  font-size: 16px;
+  background-color: #ccc;
+  border-bottom: 1px solid black;
+  padding: 0.4rem;
+}
+
+.drag-content {
+  padding: 0.4rem;
+}
+
 .card-box-container {
   display: grid;
   grid-template-columns: auto 1fr;
