@@ -74,6 +74,8 @@ export function DraggableCard({
         document.removeEventListener("mousemove", onMouseMove);
         document.removeEventListener("mouseup", onMouseUp);
       };
+    } else {
+      return null;
     }
   }, [dragging]);
 

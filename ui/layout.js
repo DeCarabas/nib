@@ -64,6 +64,9 @@
                     document.removeEventListener("mouseup", onMouseUp);
                 };
             }
+            else {
+                return null;
+            }
         }, [dragging]);
         return preact_1.h("div", { className, style }, preact_1.h("div", {
             class: "drag-title",
