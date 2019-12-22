@@ -31,8 +31,7 @@
         const [pos, setPos] = hooks_1.useState({ x: initialLeft, y: initialTop });
         const [dragging, setDragging] = hooks_1.useState(false);
         const [rel, setRel] = hooks_1.useState({ x: NaN, y: NaN });
-        const ref = hooks_1.useRef(null);
-        const className = "drag-card ba bg-white";
+        const ref = hooks_1.useRef();
         const style = { position: "absolute", left: pos.x, top: pos.y };
         const onMouseDown = (evt) => {
             if (evt.button === 0) {
@@ -68,13 +67,9 @@
                 return null;
             }
         }, [dragging]);
-        return preact_1.h("div", { className, style }, preact_1.h("div", {
-            class: "drag-title",
-            ref,
-            onMouseDown,
-            onMouseUp,
-            onMouseMove
-        }, title), preact_1.h("div", { class: "drag-content" }, children));
+        return (preact_1.h("div", { class: "drag-card ba bg-white", style: style },
+            preact_1.h("div", { class: "drag-title", ref: ref, onMouseDown: onMouseDown, onMouseUp: onMouseUp, onMouseMove: onMouseMove }, title),
+            preact_1.h("div", { class: "drag-content" }, children)));
     }
     exports.DraggableCard = DraggableCard;
 });

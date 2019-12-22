@@ -1,6 +1,8 @@
 {
   "compilerOptions": {
     "allowSyntheticDefaultImports": true,
+    "jsx": "react",
+    "jsxFactory": "h",
     "noImplicitAny": true,
     "noImplicitReturns": true,
     "sourceMap": true,
@@ -8,5 +10,5 @@
     "module": "umd",
     "moduleResolution": "node"
   },
-  "include": ["./ui/*.ts"]
+  "include": ["./ui/*.ts", "ui/layout.tsx"]
 }

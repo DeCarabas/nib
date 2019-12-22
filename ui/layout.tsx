@@ -39,9 +39,8 @@ export function DraggableCard({
   const [pos, setPos] = useState({ x: initialLeft, y: initialTop });
   const [dragging, setDragging] = useState(false);
   const [rel, setRel] = useState({ x: NaN, y: NaN });
-  const ref = useRef<SVGElement>(null);
+  const ref = useRef<HTMLDivElement>();
 
-  const className = "drag-card ba bg-white";
   const style = { position: "absolute", left: pos.x, top: pos.y };
   const onMouseDown = (evt: MouseEvent) => {
     if (evt.button === 0) {
@@ -79,20 +78,18 @@ export function DraggableCard({
     }
   }, [dragging]);
 
-  return h(
-    "div",
-    { className, style },
-    h(
-      "div",
-      {
-        class: "drag-title",
-        ref,
-        onMouseDown,
-        onMouseUp,
-        onMouseMove
-      },
-      title
-    ),
-    h("div", { class: "drag-content" }, children)
+  return (
+    <div class="drag-card ba bg-white" style={style}>
+      <div
+        class="drag-title"
+        ref={ref}
+        onMouseDown={onMouseDown}
+        onMouseUp={onMouseUp}
+        onMouseMove={onMouseMove}
+      >
+        {title}
+      </div>
+      <div class="drag-content">{children}</div>
+    </div>
   );
 }
