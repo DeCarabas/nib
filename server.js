@@ -75,7 +75,20 @@ const db = new sqlite.Database(".data/nib.db", err => {
   listener = app.listen(process.env.PORT, () => {
     console.log(`Your app is listening on port ${listener.address().port}`);
     if (process.env.NODE_ENV !== "production") {
-      require("open")("http://localhost:" + listener.address().port + "/");
+      interactiveLoop(listener);
     }
   });
 });
+
+function interactiveLoop(listener) {
+  const open = require("open");
+  const url = `http://localhost:${listener.address().port}/`;
+  open(url);
+  console.log("Press enter to launch the browser again.");
+  process.stdin.on("data", buffer => {
+    const text = buffer.toString("utf-8");
+    if (text.indexOf("\n") >= 0) {
+      open(url);
+    }
+  });
+}
